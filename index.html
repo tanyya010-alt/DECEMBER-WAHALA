@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>December Wahala</title>
+  <meta name="description" content="DECEMBER WAHALA: A Naija Detty Christmas Simulation — survive 31 days of owambes, traffic, black tax and pure enjoyment in Lagos or Abuja.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700;800&family=Nunito:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎄</text></svg>">
+</head>
+<body>
+  <!-- TITLE -->
+  <section id="screen-title" class="screen active">
+    <div class="title-wrap">
+      <div class="flag-strip"><span></span><span></span><span></span></div>
+      <p class="kicker">A Naija Detty Christmas Simulation</p>
+      <h1 class="logo">DECEMBER<br><span>WAHALA</span></h1>
+      <p class="tagline">31 days. 2 cities. Infinite owambes. The IJGBs are landing — are you ready?</p>
+      <div class="title-buttons">
+        <button class="btn primary big" id="btn-new">✨ New December</button>
+        <button class="btn big" id="btn-continue" hidden>▶ Continue</button>
+      </div>
+      <p class="fine">Inspired by life-sim classics. Made with jollof. 🇳🇬</p>
+    </div>
+  </section>
+
+  <!-- CREATE A NAIJA SIM -->
+  <section id="screen-create" class="screen">
+    <div class="create-wrap">
+      <h2>Create Your Naija Sim</h2>
+      <label class="field">
+        <span>Name</span>
+        <input id="in-name" maxlength="16" placeholder="e.g. Tolu, Chioma, Musa" autocomplete="off">
+      </label>
+      <div class="field">
+        <span>Look</span>
+        <div id="pick-avatar" class="chip-row"></div>
+      </div>
+      <div class="field">
+        <span>City</span>
+        <div id="pick-city" class="card-row"></div>
+      </div>
+      <div class="field">
+        <span>Background</span>
+        <div id="pick-role" class="card-row"></div>
+      </div>
+      <div class="create-actions">
+        <button class="btn" id="btn-back">← Back</button>
+        <button class="btn primary" id="btn-start">Start December →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- GAME -->
+  <section id="screen-game" class="screen">
+    <header class="topbar">
+      <div class="date-block">
+        <div id="date-day" class="date-day"></div>
+        <div id="date-slots" class="slots"></div>
+      </div>
+      <div id="countdown" class="countdown"></div>
+      <div class="money">
+        <div><span class="lbl">Naira</span><b id="m-naira"></b></div>
+        <div><span class="lbl">Dollars</span><b id="m-usd"></b></div>
+        <div class="fx"><span class="lbl">$1 =</span><b id="m-fx"></b></div>
+      </div>
+      <button class="btn icon" id="btn-menu" aria-label="Menu">☰</button>
+    </header>
+
+    <main class="layout">
+      <div class="col-main">
+        <div id="scene" class="scene">
+          <div class="scene-info">
+            <div id="scene-place" class="scene-place"></div>
+            <div id="scene-sub" class="scene-sub"></div>
+          </div>
+          <div class="sim">
+            <div id="plumbob" class="plumbob"></div>
+            <div id="sim-avatar" class="sim-avatar"></div>
+            <div id="sim-name" class="sim-name"></div>
+          </div>
+          <div id="moodlets" class="moodlets"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h3>What will you do?</h3>
+            <span id="power" class="power"></span>
+          </div>
+          <div id="actions" class="actions"></div>
+          <div id="bdc" class="bdc" hidden>
+            <span>💱 Change dollars:</span>
+            <button class="btn small" data-usd="50">$50</button>
+            <button class="btn small" data-usd="100">$100</button>
+            <button class="btn small" data-usd="500">$500</button>
+            <button class="btn small" data-usd="all">All</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Go somewhere</h3>
+            <div id="transport" class="seg"></div>
+          </div>
+          <div id="places" class="places"></div>
+        </div>
+      </div>
+
+      <aside class="col-side">
+        <div class="panel">
+          <div class="tabs" role="tablist">
+            <button class="tab active" data-tab="needs">Needs</button>
+            <button class="tab" data-tab="people">People</button>
+            <button class="tab" data-tab="stats">Stats</button>
+            <button class="tab" data-tab="memories">Memories</button>
+          </div>
+          <div id="tab-needs" class="tab-body active"></div>
+          <div id="tab-people" class="tab-body"></div>
+          <div id="tab-stats" class="tab-body"></div>
+          <div id="tab-memories" class="tab-body"></div>
+        </div>
+        <div class="panel feed-panel">
+          <div class="panel-head"><h3>Gist Feed</h3></div>
+          <ul id="feed" class="feed"></ul>
+        </div>
+      </aside>
+    </main>
+  </section>
+
+  <!-- ENDING -->
+  <section id="screen-end" class="screen">
+    <div class="end-wrap">
+      <div class="fireworks" aria-hidden="true">🎆 🎇 🎆</div>
+      <p class="kicker">1st January <span id="end-year"></span></p>
+      <h2 id="end-title"></h2>
+      <p id="end-scene" class="end-scene"></p>
+      <p id="end-blurb"></p>
+      <div class="score">Final score <b id="end-score"></b></div>
+      <div id="end-parts" class="end-parts"></div>
+      <h3>Achievements</h3>
+      <div id="end-ach" class="ach-grid"></div>
+      <h3>Memories</h3>
+      <ul id="end-mem" class="mem-list"></ul>
+      <button class="btn primary big" id="btn-again">Play another December</button>
+    </div>
+  </section>
+
+  <!-- MODALS -->
+  <div id="modal" class="modal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="ev-title">
+      <div id="ev-icon" class="ev-icon"></div>
+      <h3 id="ev-title"></h3>
+      <p id="ev-text"></p>
+      <div id="ev-choices" class="ev-choices"></div>
+    </div>
+  </div>
+
+  <div id="menu" class="modal" hidden>
+    <div class="modal-card">
+      <h3>Menu</h3>
+      <p class="muted">Your game saves automatically after every move.</p>
+      <div class="ev-choices">
+        <button class="btn" id="btn-resume">Resume</button>
+        <button class="btn" id="btn-help">How to play</button>
+        <button class="btn danger" id="btn-quit">Quit to title</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="help" class="modal" hidden>
+    <div class="modal-card help">
+      <h3>How to play</h3>
+      <ul>
+        <li>📅 December has 31 days with 4 time slots each. Most things take one slot.</li>
+        <li>⚡🍛🎉💬🧘 Keep your <b>needs</b> up. Your plumbob turns red when you're not okay.</li>
+        <li>🚌 Moving around costs money and time. Lagos traffic is <i>wicked</i>. Trekking is free but slow.</li>
+        <li>✈️ Family land from abroad on set days. Pick them up at the airport that same day or they'll remember it.</li>
+        <li>💱 Dollars don't spend themselves. Change them at the mall BDC. The rate moves every day.</li>
+        <li>🎊 Saturdays mean owambe. No aso-ebi? The aunties will notice.</li>
+        <li>🎆 Make it to <b>31st December night</b> for crossover. Memories, respect, clout and family love all count toward your score.</li>
+      </ul>
+      <button class="btn primary" id="btn-help-close">Oya, I don hear</button>
+    </div>
+  </div>
+
+  <script src="js/data.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/ui.js"></script>
+</body>
+</html>

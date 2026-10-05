@@ -1,0 +1,10 @@
+{
+  "name": "december-wahala",
+  "version": "1.0.0",
+  "description": "DECEMBER WAHALA: A Naija Detty Christmas Simulation",
+  "private": true,
+  "scripts": {
+    "start": "npx --yes serve .",
+    "test": "node test/simulate.js"
+  }
+}
