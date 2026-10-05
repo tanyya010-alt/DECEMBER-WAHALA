@@ -2,190 +2,213 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>December Wahala</title>
-  <meta name="description" content="DECEMBER WAHALA: A Naija Detty Christmas Simulation — survive 31 days of owambes, traffic, black tax and pure enjoyment in Lagos or Abuja.">
+  <meta name="description" content="DECEMBER WAHALA: A Naija Detty Christmas Simulation. Live your Detty December in Lagos or Abuja with real people. Everybody has a secret.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700;800&family=Nunito:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎄</text></svg>">
 </head>
 <body>
-  <!-- TITLE -->
-  <section id="screen-title" class="screen active">
-    <div class="title-wrap">
-      <div class="flag-strip"><span></span><span></span><span></span></div>
-      <p class="kicker">A Naija Detty Christmas Simulation</p>
-      <h1 class="logo">DECEMBER<br><span>WAHALA</span></h1>
-      <p class="tagline">31 days. 2 cities. Infinite owambes. The IJGBs are landing — are you ready?</p>
-      <div class="title-buttons">
-        <button class="btn primary big" id="btn-new">✨ New December</button>
-        <button class="btn big" id="btn-continue" hidden>▶ Continue</button>
+  <!-- LANDING: the live city -->
+  <section id="screen-landing" class="screen">
+    <div class="landing-map" id="landing-map"></div>
+    <header class="floatbar">
+      <div class="brand"><span class="brand-mark" aria-hidden="true"></span>December Wahala</div>
+      <div class="live"><span class="dot"></span><b id="l-online">–</b> online</div>
+      <div class="live muted-sm"><b id="l-players">–</b> players</div>
+      <div class="seg small" id="l-city">
+        <button data-city="lagos" class="sel">Lagos</button><button data-city="abuja">Abuja</button>
       </div>
-      <p class="fine">Inspired by life-sim classics. Made with jollof. 🇳🇬</p>
+      <div class="floatbar-actions">
+        <button class="btn primary" data-go="signup">Sign up</button>
+        <button class="btn ghost" data-go="login">Log in</button>
+      </div>
+    </header>
+    <div class="ticker" id="l-ticker" hidden><div class="ticker-track"></div></div>
+    <div class="landing-card">
+      <h1>DECEMBER <span>WAHALA</span></h1>
+      <p class="lede">A Naija Detty Christmas simulation. Owambes, IJGBs, traffic, black tax — and everybody in this city is hiding something.</p>
+      <div class="landing-cta">
+        <button class="btn primary big" data-go="signup">Sign up free</button>
+        <button class="btn ghost big" data-go="login">Log in</button>
+      </div>
+      <button class="linkbtn" id="btn-guest">or play offline as a guest</button>
+      <p class="offline-note" id="offline-note" hidden>Online play isn't available right now, so you can play offline. Your game saves on this device.</p>
     </div>
   </section>
 
-  <!-- CREATE A NAIJA SIM -->
-  <section id="screen-create" class="screen">
-    <div class="create-wrap">
-      <h2>Create Your Naija Sim</h2>
-      <label class="field">
-        <span>Name</span>
-        <input id="in-name" maxlength="16" placeholder="e.g. Tolu, Chioma, Musa" autocomplete="off">
-      </label>
-      <div class="field">
-        <span>Look</span>
-        <div id="pick-avatar" class="chip-row"></div>
+  <!-- AUTH -->
+  <section id="screen-auth" class="screen sky">
+    <button class="backlink" data-go="landing">← Back to the city</button>
+    <div class="auth-wrap">
+      <div class="auth-head">
+        <span class="brand-mark big" aria-hidden="true"></span>
+        <h1>December Wahala <span class="age">18+</span></h1>
+        <p>Live your Detty December with real people.</p>
       </div>
-      <div class="field">
-        <span>City</span>
-        <div id="pick-city" class="card-row"></div>
+      <form class="card auth-card" id="auth-form" novalidate>
+        <div class="tabs2" role="tablist">
+          <button type="button" data-mode="signup" class="sel">Create account</button>
+          <button type="button" data-mode="login">Log in</button>
+        </div>
+        <label class="fld signup-only"><span>Your name</span><input id="f-name" maxlength="40" placeholder="e.g. Tolu Adebayo" autocomplete="name"></label>
+        <label class="fld"><span>Username</span>
+          <div class="at"><i>@</i><input id="f-username" maxlength="21" placeholder="tolu_eko" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
+          <small class="signup-only">This is your Sim's name in the city.</small>
+        </label>
+        <label class="fld"><span>Password</span>
+          <div class="pw"><input id="f-password" type="password" autocomplete="current-password"><button type="button" class="eye" id="f-eye" aria-label="Show password">👁</button></div>
+          <small class="signup-only">At least 6 characters.</small>
+        </label>
+        <label class="fld signup-only"><span>Email (optional)</span><input id="f-email" type="email" placeholder="you@email.com" autocomplete="email">
+          <small>Only used to reset your password. Without one, a lost password can't be recovered.</small></label>
+        <label class="check signup-only"><input type="checkbox" id="f-adult"> <span>I'm <b>18 or older</b> and I agree to the <button type="button" class="inline-link" data-modal="terms">Terms</button> and <button type="button" class="inline-link" data-modal="privacy">Privacy Policy</button>.</span></label>
+        <p class="form-error" id="f-error" role="alert" hidden></p>
+        <button class="btn primary big wide" id="f-submit" type="submit">Sign up · it's free</button>
+        <p class="fineprint signup-only">Your Sim will live in the same city as everyone else who signs up.</p>
+      </form>
+    </div>
+  </section>
+
+  <!-- CREATE -->
+  <section id="screen-create" class="screen sky">
+    <div class="create-top">
+      <button class="iconbtn" id="c-back" aria-label="Back">‹</button>
+      <div class="create-title"><h2 id="c-title">Look</h2><div class="dashes" id="c-dashes"></div></div>
+      <div class="create-top-right">
+        <button class="iconbtn" id="c-shuffle" aria-label="Shuffle" title="Shuffle">⤮</button>
+        <button class="btn primary" id="c-next">Next</button>
       </div>
-      <div class="field">
-        <span>Background</span>
-        <div id="pick-role" class="card-row"></div>
-      </div>
-      <div class="create-actions">
-        <button class="btn" id="btn-back">← Back</button>
-        <button class="btn primary" id="btn-start">Start December →</button>
+    </div>
+    <div class="create-body">
+      <div class="stage" id="c-stage"><span class="stage-hint">Drag to spin</span></div>
+      <div class="card create-panel">
+        <div class="create-scroll" id="c-panel"></div>
+        <div class="create-foot"><button class="btn primary big wide" id="c-continue">Continue</button></div>
       </div>
     </div>
   </section>
 
   <!-- GAME -->
-  <section id="screen-game" class="screen">
-    <header class="topbar">
-      <div class="date-block">
-        <div id="date-day" class="date-day"></div>
-        <div id="date-slots" class="slots"></div>
-      </div>
-      <div id="countdown" class="countdown"></div>
-      <div class="money">
-        <div><span class="lbl">Naira</span><b id="m-naira"></b></div>
-        <div><span class="lbl">Dollars</span><b id="m-usd"></b></div>
-        <div class="fx"><span class="lbl">$1 =</span><b id="m-fx"></b></div>
-      </div>
-      <button class="btn icon" id="btn-menu" aria-label="Menu">☰</button>
+  <section id="screen-game" class="screen sky">
+    <header class="floatbar game-bar">
+      <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span class="brand-text">December Wahala</span></div>
+      <div class="when"><b id="g-date"></b><div class="slots" id="g-slots"></div></div>
+      <div class="live" id="g-live" hidden><span class="dot"></span><b id="g-online">–</b> online</div>
+      <div class="money"><div><small>Naira</small><b id="g-naira"></b></div><div><small>Dollars</small><b id="g-usd"></b></div><div class="hide-sm"><small>$1 =</small><b id="g-fx"></b></div></div>
+      <button class="iconbtn" id="g-menu" aria-label="Menu">☰</button>
     </header>
-
-    <main class="layout">
-      <div class="col-main">
-        <div id="scene" class="scene">
-          <div class="scene-info">
-            <div id="scene-place" class="scene-place"></div>
-            <div id="scene-sub" class="scene-sub"></div>
-          </div>
-          <div class="sim">
-            <div id="plumbob" class="plumbob"></div>
-            <div id="sim-avatar" class="sim-avatar"></div>
-            <div id="sim-name" class="sim-name"></div>
-          </div>
-          <div id="moodlets" class="moodlets"></div>
-        </div>
-
-        <div class="panel">
-          <div class="panel-head">
-            <h3>What will you do?</h3>
-            <span id="power" class="power"></span>
-          </div>
-          <div id="actions" class="actions"></div>
-          <div id="bdc" class="bdc" hidden>
-            <span>💱 Change dollars:</span>
-            <button class="btn small" data-usd="50">$50</button>
-            <button class="btn small" data-usd="100">$100</button>
-            <button class="btn small" data-usd="500">$500</button>
-            <button class="btn small" data-usd="all">All</button>
-          </div>
-        </div>
-
-        <div class="panel">
-          <div class="panel-head">
-            <h3>Go somewhere</h3>
-            <div id="transport" class="seg"></div>
-          </div>
-          <div id="places" class="places"></div>
+    <div class="ticker" id="g-ticker"><div class="ticker-track"></div></div>
+    <main class="game-grid">
+      <div class="card map-card">
+        <div class="map-scroll" id="g-map"></div>
+        <div class="map-tools">
+          <span class="muted-sm">Travel by</span>
+          <div class="seg small" id="g-transport"></div>
+          <span class="countdown" id="g-countdown"></span>
         </div>
       </div>
-
-      <aside class="col-side">
-        <div class="panel">
-          <div class="tabs" role="tablist">
-            <button class="tab active" data-tab="needs">Needs</button>
-            <button class="tab" data-tab="people">People</button>
-            <button class="tab" data-tab="stats">Stats</button>
-            <button class="tab" data-tab="memories">Memories</button>
-          </div>
-          <div id="tab-needs" class="tab-body active"></div>
-          <div id="tab-people" class="tab-body"></div>
-          <div id="tab-stats" class="tab-body"></div>
-          <div id="tab-memories" class="tab-body"></div>
+      <aside class="card side">
+        <div class="tabs2" role="tablist" id="g-tabs">
+          <button data-tab="here" class="sel">Here</button>
+          <button data-tab="me">Me</button>
+          <button data-tab="wardrobe">Wardrobe</button>
+          <button data-tab="diary">Diary</button>
         </div>
-        <div class="panel feed-panel">
-          <div class="panel-head"><h3>Gist Feed</h3></div>
-          <ul id="feed" class="feed"></ul>
-        </div>
+        <div class="tab-body" id="tab-here"></div>
+        <div class="tab-body" id="tab-me" hidden></div>
+        <div class="tab-body" id="tab-wardrobe" hidden></div>
+        <div class="tab-body" id="tab-diary" hidden></div>
       </aside>
     </main>
   </section>
 
   <!-- ENDING -->
-  <section id="screen-end" class="screen">
-    <div class="end-wrap">
-      <div class="fireworks" aria-hidden="true">🎆 🎇 🎆</div>
-      <p class="kicker">1st January <span id="end-year"></span></p>
-      <h2 id="end-title"></h2>
-      <p id="end-scene" class="end-scene"></p>
-      <p id="end-blurb"></p>
-      <div class="score">Final score <b id="end-score"></b></div>
-      <div id="end-parts" class="end-parts"></div>
-      <h3>Achievements</h3>
-      <div id="end-ach" class="ach-grid"></div>
+  <section id="screen-end" class="screen sky">
+    <div class="end-wrap card">
+      <p class="eyebrow">1st January <span id="e-year"></span></p>
+      <h1 id="e-title"></h1>
+      <p class="end-scene" id="e-scene"></p>
+      <p id="e-blurb"></p>
+      <div class="score">Final score<b id="e-score"></b></div>
+      <div class="end-grid" id="e-parts"></div>
+      <h3>Who were they really?</h3>
+      <div class="truths" id="e-truths"></div>
+      <h3>Badges</h3>
+      <div class="badges" id="e-badges"></div>
       <h3>Memories</h3>
-      <ul id="end-mem" class="mem-list"></ul>
-      <button class="btn primary big" id="btn-again">Play another December</button>
+      <ul class="memories" id="e-mem"></ul>
+      <button class="btn primary big" id="e-again">Play another December</button>
     </div>
   </section>
 
   <!-- MODALS -->
-  <div id="modal" class="modal" hidden>
-    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="ev-title">
-      <div id="ev-icon" class="ev-icon"></div>
+  <div class="modal" id="m-event" hidden>
+    <div class="card modal-card" role="dialog" aria-modal="true" aria-labelledby="ev-title">
+      <div class="ev-icon" id="ev-icon"></div>
       <h3 id="ev-title"></h3>
       <p id="ev-text"></p>
-      <div id="ev-choices" class="ev-choices"></div>
+      <div class="choices" id="ev-choices"></div>
     </div>
   </div>
-
-  <div id="menu" class="modal" hidden>
-    <div class="modal-card">
+  <div class="modal" id="m-menu" hidden>
+    <div class="card modal-card">
       <h3>Menu</h3>
-      <p class="muted">Your game saves automatically after every move.</p>
-      <div class="ev-choices">
-        <button class="btn" id="btn-resume">Resume</button>
-        <button class="btn" id="btn-help">How to play</button>
-        <button class="btn danger" id="btn-quit">Quit to title</button>
+      <p class="muted" id="menu-who"></p>
+      <div class="choices">
+        <button class="btn" data-close>Resume</button>
+        <button class="btn" data-modal="help">How to play</button>
+        <button class="btn" id="btn-restart">Start a new December</button>
+        <button class="btn" id="btn-logout">Log out</button>
       </div>
     </div>
   </div>
-
-  <div id="help" class="modal" hidden>
-    <div class="modal-card help">
+  <div class="modal" id="m-confirm" hidden>
+    <div class="card modal-card">
+      <h3>Start over?</h3>
+      <p>This deletes your current December, including your progress and everything you know about other players. Your account stays.</p>
+      <div class="choices"><button class="btn danger" id="btn-restart-yes">Delete and start over</button><button class="btn" data-close>Keep playing</button></div>
+    </div>
+  </div>
+  <div class="modal" id="m-help" hidden>
+    <div class="card modal-card prose">
       <h3>How to play</h3>
       <ul>
-        <li>📅 December has 31 days with 4 time slots each. Most things take one slot.</li>
-        <li>⚡🍛🎉💬🧘 Keep your <b>needs</b> up. Your plumbob turns red when you're not okay.</li>
-        <li>🚌 Moving around costs money and time. Lagos traffic is <i>wicked</i>. Trekking is free but slow.</li>
-        <li>✈️ Family land from abroad on set days. Pick them up at the airport that same day or they'll remember it.</li>
-        <li>💱 Dollars don't spend themselves. Change them at the mall BDC. The rate moves every day.</li>
-        <li>🎊 Saturdays mean owambe. No aso-ebi? The aunties will notice.</li>
-        <li>🎆 Make it to <b>31st December night</b> for crossover. Memories, respect, clout and family love all count toward your score.</li>
+        <li>December has 31 days with four time slots each. Most things take one slot.</li>
+        <li>Tap a place on the map to travel there. Lagos traffic is wicked. Trekking is free but slow.</li>
+        <li>Keep ⚡ Energy, 🍛 Belle and 🔥 Vibes up. Build 📱 Clout, 🤝🏾 Reputation and 🔗 Connections.</li>
+        <li>Your persona has a superpower, a weakness and a <b>secret</b>. If your secret meter fills, you're exposed.</li>
+        <li>Everyone else has secrets too — the characters in town and the real players. Gist, investigate, then expose them or keep their secret.</li>
+        <li>Your fit matters. Each style "eats" in certain places. Change outfits at home.</li>
+        <li>Family land from abroad on set days. Pick them up at the airport.</li>
+        <li>Reach crossover night on the 31st. Hit your December goal for a big bonus.</li>
       </ul>
-      <button class="btn primary" id="btn-help-close">Oya, I don hear</button>
+      <button class="btn primary" data-close>Oya, I don hear</button>
+    </div>
+  </div>
+  <div class="modal" id="m-terms" hidden>
+    <div class="card modal-card prose">
+      <h3>Terms</h3>
+      <p>December Wahala is a free game for adults (18+). Be decent to other players: no harassment, hate, or real-world personal information in names. Secrets in the game are fictional and belong to game personas, not to real people. We may remove accounts that break these rules. The game is provided as-is.</p>
+      <button class="btn primary" data-close>Close</button>
+    </div>
+  </div>
+  <div class="modal" id="m-privacy" hidden>
+    <div class="card modal-card prose">
+      <h3>Privacy</h3>
+      <p>We store your name, username, a scrambled (hashed) version of your password, your optional email, and your game progress. Other players can see your username, display name, character look, city, area, current in-game location and clout. We use one cookie to keep you signed in. No ads, no ad trackers.</p>
+      <button class="btn primary" data-close>Close</button>
     </div>
   </div>
 
+  <script src="js/vendor/three.min.js"></script>
   <script src="js/data.js"></script>
+  <script src="js/avatar.js"></script>
+  <script src="js/avatar3d.js"></script>
+  <script src="js/map.js"></script>
   <script src="js/engine.js"></script>
   <script src="js/ui.js"></script>
 </body>
