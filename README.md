@@ -6,7 +6,17 @@ A shared-city life sim set in **Lagos** and **Abuja** during Detty December. Cre
 
 ## How it plays
 
-**An explorable city.** Lagos (mainland, lagoon, bridges, the Island, the beach) or Abuja (Ring Road park, Jabi Lake, Aso Rock) in low-poly 3D. Walk with **WASD / arrow keys** (Shift to run) or the on-screen joystick on phones. Press **E** (or ✋) to go inside places and talk to people. The camera follows you; buildings, stalls, water and trees block your way; cars stop for you.
+**Play it like The Sims.** Click or tap anywhere to walk there (pathfinding routes you around buildings, furniture and the lagoon). Click a **person**, an **object** or a **building** to open a pie menu of things to do. What you pick goes into an **action queue**: your Sim walks over, sits down, eats, dances, chats or showers, one after the other; tap a queued action to cancel it. WASD/arrow keys and the phone joystick still work, **Q / R** or right-drag turns the camera, and scroll or pinch zooms.
+
+**Walk-in venues.** Every building has a furnished cutaway interior (walls drop down, Sims-style): tables and chairs at Mama T's, a dance floor with a disco ball at Club Eko, pews and a choir at church, treadmills at the gym, a bar, a DJ booth, toilets and showers. People sit at tables and eat, drink at the bar, dance, pray, work out and chat, with speech bubbles over their heads. Staff work the counters. Characters sit, lie in bed, eat, cook, dance, pray, sing, talk on the phone and work out.
+
+**Needs, emotions and skills.** Six needs (Belle, Energy, Bladder, Hygiene, Fun, Social). Your emotion — Happy, Confident, Flirty, Energized, Playful, Focused, Inspired, Tense, Sad, Angry, Embarrassed, Uncomfortable, Bored — comes from the moodlets you collect ("Party Jollof Perfection", "Caught in 4K", "Hot Night, No Light") and changes how well socials land, how fast skills grow and how much gigs pay. Six skills grow as you do things: Charisma, Cooking, Dancing, Fitness, Photography and Hustle.
+
+**Socials.** Friendly, Funny, Romantic, Mean, Mischief, Naija (spray money, swap Instagrams, ask to be linked up) and Secret interactions, each with a chance to land. Friendship and romance build separately. People walk over to you on their own to greet, joke, flirt — or throw shade.
+
+**Buy mode.** Upgrade your flat: beds, TVs (and a PS5), kitchens, sound systems, a generator or inverter, a fan or AC, a full-length mirror, wall art and a ring light. Upgrades show up in the room and change how well you sleep, cook, post and relax.
+
+**An explorable city.** Lagos (mainland, lagoon, bridges, the Island, the beach) or Abuja (Ring Road park, Jabi Lake, Aso Rock) in low-poly 3D. Crowds follow the clock: offices by day, mama puts at lunch, church on Sunday morning, clubs and suya spots at night. Cars stop for you.
 
 **Real time.** One real second is one game minute at normal speed (⏸ ▶ ▶▶ ▶▶▶, or Space and 1–3). A game day is about 24 real minutes. Activities like eating, partying and sleeping fast-forward while they run, and so do rides.
 
@@ -47,7 +57,11 @@ A shared-city life sim set in **Lagos** and **Abuja** during Detty December. Cre
 | `js/world-data.js` | Street grid, places and hours, actions, items, people and schedules, questions, story chains, missions, identities, achievements |
 | `js/nav.js` | Road graph and A* paths |
 | `js/sim.js` | The real-time game engine (DOM-free; runs in Node for tests) |
-| `js/world3d.js` | The 3D city, movement, collisions, camera, people, day/night, home interior |
+| `js/sims-data.js` | Life-sim data: needs, emotions and moodlets, skills, socials, furniture, venue interiors |
+| `js/world3d.js` | The 3D city, click-to-move, picking, camera, people, interiors, speech bubbles, day/night |
+| `js/rooms.js` | Builds the furnished walk-in interiors |
+| `js/poses.js` | Character poses and animation (sit, lie, eat, dance, pray, cook, talk…) |
+| `js/gridnav.js` | Grid A* pathfinding for click-to-move |
 | `js/avatar3d.js` | Rigged low-poly 3D characters (three.js r128, vendored in `js/vendor/`) |
 | `js/avatar.js` | Flat SVG characters for portraits and lists |
 | `js/app.js` | Landing, accounts, creator, HUD, panels, phone, ending |

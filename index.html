@@ -115,16 +115,23 @@
 
       <button class="hud-phone-btn" id="h-phone-btn" aria-label="Phone">📱<span class="badge" id="h-unread" hidden></span></button>
 
+      <div class="hud-queue" id="h-queue" aria-label="What you're doing next"></div>
+
       <div class="hud-me" id="h-me">
-        <button class="hud-face" id="h-face" aria-label="Your character"></button>
-        <div class="hud-needs" id="h-needs"></div>
-        <button class="btn primary sm hud-ability" id="h-ability"></button>
+        <button class="hud-face" id="h-face" aria-label="Your Sim"><span class="face-svg" id="h-face-svg"></span><span class="emo-badge" id="h-emo"></span></button>
+        <div class="hud-panel">
+          <div class="hud-needs" id="h-needs"></div>
+          <div class="hud-moodlets" id="h-moodlets"></div>
+          <button class="btn primary sm hud-ability" id="h-ability"></button>
+        </div>
       </div>
 
       <div class="hud-next" id="h-next"></div>
 
       <nav class="hud-nav" id="h-nav">
-        <button data-panel="me"><span>👤</span>Me</button>
+        <button data-panel="place" id="h-here" hidden><span>📋</span>Here</button>
+        <button data-panel="me"><span>👤</span>Sim</button>
+        <button data-panel="buy" id="h-buy" hidden><span>🛋️</span>Buy</button>
         <button data-panel="bag"><span>👜</span>Bag</button>
         <button data-panel="map"><span>🗺️</span>Map</button>
         <button data-panel="phone"><span>📱</span>Phone<i class="badge" id="h-unread2" hidden></i></button>
@@ -137,6 +144,8 @@
 
       <div class="joystick" id="h-joy" hidden><div class="joy-knob"></div></div>
       <button class="interact-btn" id="h-interact" hidden aria-label="Interact">✋</button>
+
+      <div class="pie" id="pie" hidden></div>
 
       <aside class="sheet card" id="sheet" hidden>
         <div class="sheet-head"><h3 id="sheet-title"></h3><button class="iconbtn sm" id="sheet-close" aria-label="Close">✕</button></div>
@@ -206,12 +215,16 @@
     <div class="card modal-card prose">
       <h3>How to play</h3>
       <ul>
-        <li><b>Move</b> with WASD or the arrow keys (hold Shift to run). On a phone, use the joystick.</li>
-        <li><b>E</b> (or ✋) goes inside places and starts conversations. Walk up to people — everyone in the city is somebody.</li>
+        <li><b>Click or tap anywhere</b> to walk there. Click a <b>person</b>, an <b>object</b> or a <b>building</b> to open its menu, just like The Sims. You can also use WASD or the arrow keys (Shift to run), or the joystick on a phone.</li>
+        <li>Everything you pick goes into your <b>queue</b> (bottom left). Your Sim walks over and does each thing in order. Tap a queued action to cancel it.</li>
+        <li>Walk into any venue: sit at tables, dance on the floor, order at the bar, use the toilet. <b>Q / R</b> or right-drag turns the camera; scroll or pinch to zoom.</li>
+        <li><b>Socials</b> are grouped like The Sims: Friendly, Funny, Romantic, Mean, Mischief, Naija and Secrets. Friendship ❤️ and romance 💞 build separately, and how you feel changes how well things land.</li>
+        <li>Your Sim has <b>six needs</b> (Belle, Energy, Bladder, Hygiene, Fun, Social) and <b>emotions</b> made of moodlets. Confident Sims charm better; Flirty Sims flirt better; Tense or Angry ones… don't.</li>
+        <li><b>Skills</b> grow as you do things: Charisma, Cooking, Dancing, Fitness, Photography and Hustle. Use <b>Buy</b> mode at home to upgrade your bed, TV, kitchen, power and more.</li>
         <li><b>Time</b> runs like a real day: 1 second is 1 game minute. Use ⏸ ▶ ▶▶ ▶▶▶ to pause or speed up. Activities fast-forward while they happen.</li>
         <li>Places keep <b>opening hours</b>. Clubs open at 10pm, banks close at 4pm, owambes happen on Saturdays.</li>
         <li><b>Map</b> lets you walk there automatically or take a danfo, keke, okada or Bolt. Traffic can turn 12 minutes into 35.</li>
-        <li>Keep ⚡ Energy, 🍛 Belle and 🔥 Vibes up. Build 📱 Clout, 🤝🏾 Reputation and 🔗 Connections — reputation and clout are not the same thing.</li>
+        <li>Build 📱 Clout, 🤝🏾 Reputation and 🔗 Connections — reputation and clout are not the same thing.</li>
         <li>Everybody has a <b>secret</b>, including you. Dig into people's stories, then keep, trade, expose or use what you learn. People remember what you did.</li>
         <li>Your <b>phone</b> brings invitations, family requests, brand deals and drama. Say yes, then actually show up.</li>
         <li>Make it to <b>crossover night</b> on the 31st. Be at a church, club, rooftop, beach or home before midnight.</li>
@@ -237,10 +250,14 @@
   <script src="js/vendor/three.min.js"></script>
   <script src="js/data.js"></script>
   <script src="js/world-data.js"></script>
+  <script src="js/sims-data.js"></script>
   <script src="js/nav.js"></script>
   <script src="js/sim.js"></script>
   <script src="js/avatar.js"></script>
   <script src="js/avatar3d.js"></script>
+  <script src="js/gridnav.js"></script>
+  <script src="js/poses.js"></script>
+  <script src="js/rooms.js"></script>
   <script src="js/world3d.js"></script>
   <script src="js/app.js"></script>
 </body>

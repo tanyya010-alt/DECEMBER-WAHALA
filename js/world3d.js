@@ -2,9 +2,12 @@
 // Builds Lagos or Abuja from WORLD data, moves the player with keys or a
 // joystick, handles collisions, follows with the camera, draws everyone the
 // sim says is out on the streets, and runs day/night and December decorations.
-/* global THREE, WORLD, DATA, NAV, Avatar3D */
+/* global THREE, WORLD, DATA, NAV, Avatar3D, GridNav, Rooms, Poses */
 (function () {
   const W = window.WORLD, D = window.DATA, NAV = window.NAV;
+  const SIMS = W.SIMS;
+  const ROOM_Z = 400; // interiors are built far away from the city
+  const CHATTER = ["💬", "😂", "☕", "🎶", "👀", "💅🏾", "🙌🏾", "🤣", "🍗", "📱", "💸", "🎄", "🔥", "🥂", "🤫", "❤️"];
   const G = W.GRID;
   const lam = (color, extra) => new THREE.MeshLambertMaterial({ color, ...extra });
   const box = (w, h, d, mat) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
@@ -80,6 +83,17 @@
       this.labels = new Map();
       this.time = 0;
       this.mobile = matchMedia("(pointer: coarse)").matches;
+      this.pickables = [];
+      this.room = null;
+      this.interiorPlace = null;
+      this.walk = null;
+      this.seat = null;
+      this.camYaw = 0;
+      this.bubbles = new Map();
+      this.assign = new Map();
+      this.staff = [];
+      this.chatT = 0;
+      this.raycaster = new THREE.Raycaster();
 
       const r = new THREE.WebGLRenderer({ antialias: !this.mobile, powerPreference: "high-performance" });
       r.setPixelRatio(Math.min(this.mobile ? 1.5 : 2, devicePixelRatio || 1));
@@ -107,7 +121,12 @@
       this.cityGroup.add(this.xmas);
       this.buildCity();
       this.buildVehicles();
-      this.buildInterior();
+      // Walk grid for click-to-move around the city.
+      this.cityNav = new GridNav(G.bounds.x[0] - 2, -62, G.bounds.x[1] + 2, 64, 1);
+      this.colliders.forEach((c) => this.cityNav.block(c, PLAYER_R));
+      this.marker = new THREE.Mesh(new THREE.RingGeometry(0.35, 0.55, 24), new THREE.MeshBasicMaterial({ color: 0x20b46e, transparent: true, opacity: 0.9, side: THREE.DoubleSide }));
+      this.marker.rotation.x = -Math.PI / 2; this.marker.visible = false;
+      this.scene.add(this.marker);
       this.buildPlayer(sim.s.look);
       this.placePlayer();
 
@@ -123,7 +142,6 @@
         this.sun.shadow.bias = -0.0015;
         this.scene.add(this.sun.target);
         this.cityGroup.traverse((o) => { if (o.isMesh || o.isInstancedMesh) { o.castShadow = !(o.geometry && o.geometry.type === "PlaneGeometry"); o.receiveShadow = true; } });
-        this.room.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
         this.shadowify(this.player);
       }
 
@@ -204,7 +222,16 @@
       this.collider(B.x[0] - 5, 5, 10, 200); this.collider(B.x[1] + 5, 5, 10, 200); this.collider(0, B.z[0] - 5, 200, 10);
 
       // Places.
-      for (const p of Object.values(this.places)) if (!p.remote) this.buildPlace(p);
+      for (const p of Object.values(this.places)) {
+        if (p.remote) continue;
+        const n0 = this.cityGroup.children.length;
+        this.buildPlace(p);
+        const pick = { kind: "place", id: p.id };
+        for (let i = n0; i < this.cityGroup.children.length; i++) {
+          const m = this.cityGroup.children[i];
+          if (m.isMesh && !m.isInstancedMesh) { m.userData.pick = pick; this.pickables.push(m); }
+        }
+      }
 
       // Street lamps along the roads.
       const lampPos = [];
@@ -456,65 +483,98 @@
       });
     }
 
-    // ------------------------------------------------------------ home interior
-    buildInterior() {
-      const g = new THREE.Group();
-      g.position.set(0, 0, 400);
-      g.visible = false;
-      this.scene.add(g);
-      this.room = g;
-      this.roomColliders = [];
-      this.roomObjects = [];
-      const W2 = 12, D2 = 10;
-      const floor = new THREE.Mesh(new THREE.PlaneGeometry(W2, D2), lam(0xffffff, { map: tileTexture("#e9dcc5", "#d9c7a8") }));
-      floor.rotation.x = -Math.PI / 2; g.add(floor);
-      const wall = lam(0xf0d9b5);
-      const back = box(W2, 4, 0.3, wall); back.position.set(0, 2, -D2 / 2); g.add(back);
-      const left = box(0.3, 4, D2, wall); left.position.set(-W2 / 2, 2, 0); g.add(left);
-      const trim = lam(0xa1785a);
-      const base = box(W2 + 0.4, 0.5, D2 + 0.4, trim); base.position.set(0, -0.26, 0); g.add(base);
-      const add = (m, x, y, z, collide) => { m.position.set(x, y, z); g.add(m); if (collide) this.roomColliders.push({ x0: x - collide[0] / 2, x1: x + collide[0] / 2, z0: z - collide[1] / 2, z1: z + collide[1] / 2 }); return m; };
-      const obj = (id, label, x, z, action) => this.roomObjects.push({ id, label, x, z, action });
-      // Bed.
-      add(box(2.6, 0.5, 3.6, lam(0x8d6e63)), -3.8, 0.25, -2.9, [2.6, 3.6]);
-      add(box(2.4, 0.35, 3.0, lam(0xc62828)), -3.8, 0.65, -2.6);
-      add(box(2.0, 0.25, 0.7, lam(0xffffff)), -3.8, 0.85, -4.2);
-      obj("bed", "🛏️ Bed", -2.1, -2.6, "sleep");
-      // Wardrobe and mirror.
-      add(box(1.6, 3.2, 0.8, lam(0xd7b98e)), -5.4, 1.6, 1.6, [1.0, 1.6]);
-      add(box(0.9, 2.2, 0.08, lam(0xcfe8ff)), -5.75, 1.5, 3.6);
-      obj("mirror", "🪞 Mirror & wardrobe", -4.6, 3.2, "wardrobe");
-      // Desk with laptop and ring light.
-      add(box(2.4, 0.12, 1.1, lam(0xd7b98e)), 1.6, 1.0, -4.2, [2.4, 1.2]);
-      add(box(0.9, 0.05, 0.6, lam(0x9e9e9e)), 1.6, 1.1, -4.2);
-      const screen = add(box(0.9, 0.55, 0.04, lam(0x37474f)), 1.6, 1.38, -4.48); screen.rotation.x = -0.25;
-      add(box(0.7, 0.9, 0.7, lam(0xffab91)), 1.6, 0.45, -3.2);
-      add(new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.06, 6, 20), new THREE.MeshBasicMaterial({ color: 0xffffff })), 3.6, 2.6, -4.3);
-      add(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 2.2, 4), lam(0x222222)), 3.6, 1.2, -4.3);
-      obj("desk", "💻 Desk", 1.6, -2.6, "post_home");
-      // TV.
-      add(box(3, 0.6, 0.8, lam(0xd7b98e)), 4.4, 0.3, -1.4, [3, 0.9]);
-      add(box(2.4, 1.4, 0.1, lam(0x111111)), 4.4, 1.4, -1.7);
-      obj("tv", "📺 TV", 4.2, 0.2, "tv");
-      // Stove and cooler.
-      add(box(1.4, 1.0, 1.0, lam(0xbcaaa4)), 4.8, 0.5, 2.8, [1.4, 1.0]);
-      add(box(1.2, 0.05, 0.8, lam(0x424242)), 4.8, 1.03, 2.8);
-      obj("stove", "🍳 Stove", 4.0, 2.2, "cook");
-      add(box(1.1, 0.9, 0.8, lam(0x1565c0)), 2.6, 0.45, 4.2, [1.1, 0.8]);
-      add(box(1.1, 0.2, 0.8, lam(0xffffff)), 2.6, 0.95, 4.2);
-      // Table and chairs.
-      add(new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 0.1, 18), lam(0xa1785a)), -1.2, 1.0, 2.2, [2, 2]);
-      add(new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.3, 1, 8), lam(0x6d4c41)), -1.2, 0.5, 2.2);
-      // Fan, plant, door.
-      add(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.4, 4), lam(0x222222)), 0, 1.2, -4.4);
-      add(new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.1, 10), lam(0x26a69a)), 0, 2.4, -4.3).rotation.x = Math.PI / 2;
-      add(new THREE.Mesh(new THREE.ConeGeometry(0.45, 1.4, 6), lam(0x43a047, { flatShading: true })), -5.2, 0.9, -0.6);
-      add(box(0.1, 2.6, 1.4, lam(0x5b3a23)), -5.9, 1.3, -0.15);
-      obj("door", "🚪 Go outside", -5.0, -0.15, "exit");
-      const light = new THREE.PointLight(0xffe2b8, 0.7, 20);
-      light.position.set(0, 3.5, 0);
-      g.add(light);
-      this.roomColliders.push({ x0: -7, x1: -W2 / 2 + 0.3, z0: -6, z1: 6 }, { x0: -7, x1: 7, z0: -7, z1: -D2 / 2 + 0.3 }, { x0: W2 / 2, x1: 8, z0: -6, z1: 6 }, { x0: -7, x1: 7, z0: D2 / 2, z1: 7 });
+    // ------------------------------------------------------------ interiors
+    // Walk inside a venue: build its room, its walk grid and where things are.
+    enterRoom(placeId, silent) {
+      const pl = this.places[placeId];
+      if (!pl || pl.kind !== "building") return;
+      this.disposeRoom();
+      const s = this.sim.s;
+      const room = Rooms.build(pl.type, { home: s.home, day: this.sim.day() });
+      room.group.position.set(0, 0, ROOM_Z);
+      this.scene.add(room.group);
+      if (this.shadows) room.group.traverse((o) => { if (o.isMesh) { o.castShadow = !o.userData.floor && !o.userData.wall; o.receiveShadow = true; } });
+      const nav = new GridNav(-room.w / 2 - 1, ROOM_Z - room.d / 2 - 1, room.w / 2 + 1, ROOM_Z + room.d / 2 + 2, 0.5);
+      room.colliders.forEach((c) => nav.block({ x0: c.x0, x1: c.x1, z0: c.z0 + ROOM_Z, z1: c.z1 + ROOM_Z }, PLAYER_R * 0.75));
+      room.nav = nav;
+      // Where to stand to use each thing.
+      room.objects.forEach((o) => {
+        const toC = Math.atan2(-o.x, -o.z * 0.6 + 0.0001);
+        let ap = null;
+        for (const r of [0, 0.7, -0.7, 1.4, -1.4, Math.PI]) {
+          const a = toC + r, dist = Math.max(o.w, o.d) / 2 + 0.7;
+          const x = o.x + Math.sin(a) * dist, z = o.z + Math.cos(a) * dist;
+          if (nav.freeAt(x, z + ROOM_Z)) { ap = { x, z }; break; }
+        }
+        if (!ap) { const sn = nav.snap(o.x, o.z + ROOM_Z); ap = sn ? { x: sn.x, z: sn.z - ROOM_Z } : { x: 0, z: room.d / 2 - 1.2 }; }
+        if (o.k === "door") ap = { x: 0, z: room.d / 2 - 1.0 };
+        o.ap = ap;
+        o.face = Math.atan2(o.x - ap.x, o.z - ap.z);
+      });
+      this.room = room;
+      this.interior = true;
+      this.interiorPlace = placeId;
+      this.homeKey = placeId === "home" ? JSON.stringify(s.home) : null;
+      this.cityGroup.visible = false;
+      this.assign.clear();
+      this.buildStaff();
+      this.walk = null; this.seat = null;
+      this.player.position.set(0, 0, ROOM_Z + room.d / 2 - 1.3);
+      this.player.rotation.y = Math.PI;
+      this.snapCamera = true;
+      if (this.hooks.onRoom) this.hooks.onRoom(true, placeId, silent);
+    }
+    disposeRoom() {
+      if (!this.room) return;
+      this.scene.remove(this.room.group);
+      this.room.group.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
+      this.staff.forEach((m) => this.scene.remove(m.model));
+      this.staff = [];
+      this.room = null;
+    }
+    leaveInterior() { this.disposeRoom(); this.interior = false; this.interiorPlace = null; this.cityGroup.visible = true; this.seat = null; this.walk = null; }
+    // Step out of the front door onto the street.
+    exitRoom() {
+      const id = this.interiorPlace || this.sim.s.place || "home";
+      this.leaveInterior();
+      const p = this.places[id] || this.places.home;
+      const dz = p.side === "S" ? 1.4 : -1.4;
+      this.player.position.set(p.door.x, 0, p.door.z + dz);
+      this.player.rotation.y = p.side === "S" ? 0 : Math.PI;
+      this.sim.leave();
+      this.sim.setPos(p.door.x, p.door.z + dz);
+      this.snapCamera = true;
+      if (this.hooks.onRoom) this.hooks.onRoom(false, id);
+    }
+    enterHome(silent) { this.enterRoom("home", silent); }
+    exitHome() { this.exitRoom(); }
+    roomObject(fn) { return this.room ? this.room.objects.find(fn) : null; }
+    // Shop staff, bartenders and DJs who work in the room.
+    buildStaff() {
+      if (!this.room) return;
+      const pl = this.places[this.interiorPlace];
+      if (pl.type === "home" || pl.type === "family" || !W.isOpen(pl.type, this.sim.s.t)) return;
+      const vendors = W.NPCS.filter((n) => n.vendor && this.sim.s.npcs[n.id].place === this.interiorPlace).length;
+      let k = 0;
+      this.room.objects.filter((o) => o.vendorSpot).forEach((o, i) => {
+        if (i < vendors) return;
+        const r = (n) => { k = (k * 9301 + 49297 + n * 7) % 233280; return k / 233280; };
+        r(i + this.interiorPlace.length * 13);
+        const body = r(1) < 0.5 ? "woman" : "man";
+        const hairs = Object.keys(D.HAIR[body]);
+        const look = { body, skin: Math.floor(r(2) * 7), hair: hairs[Math.floor(r(3) * hairs.length)], hairColour: "black", style: pl.type === "club" || pl.type === "lounge" ? "allblack" : "streetwear", colour: Math.floor(r(4) * 10), fabric: "plain", build: "regular" };
+        const model = Avatar3D.build(look, { lite: true });
+        model.scale.multiplyScalar(HUMAN);
+        model.rotation.order = "YXZ";
+        const [vx, vz, vr] = o.vendorSpot;
+        model.position.set(vx, 0, vz + ROOM_Z);
+        model.rotation.y = vr;
+        model.userData.pick = { kind: "object", obj: o };
+        model.traverse((m) => { if (m.isMesh) m.userData.pick = model.userData.pick; });
+        this.shadowify(model);
+        this.scene.add(model);
+        this.staff.push({ model, pose: o.k === "pots" || o.k === "stove" ? "cook" : o.k === "dj" ? "dance" : "stand", obj: o });
+      });
     }
 
     // ------------------------------------------------------------ the player
@@ -524,11 +584,14 @@
       const full = { ...look, shoes: s.equip.shoes || "slippers", bag: s.equip.bag, watch: s.equip.jewelry === "gold_watch", chain: s.equip.jewelry === "chain" || look.chain };
       this.player = Avatar3D.build(full);
       this.player.scale.multiplyScalar(HUMAN);
+      this.player.rotation.order = "YXZ";
       this.player.userData.phase = 0;
+      this.player.userData.pick = { kind: "self" };
+      this.player.traverse((m) => { if (m.isMesh) m.userData.pick = this.player.userData.pick; });
       const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.45, 16), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.2 }));
       shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.02;
       this.player.add(shadow);
-      const ring = new THREE.Mesh(new THREE.OctahedronGeometry(0.16), new THREE.MeshBasicMaterial({ color: 0x20b46e }));
+      const ring = new THREE.Mesh(new THREE.OctahedronGeometry(0.16), new THREE.MeshLambertMaterial({ color: 0x20b46e, emissive: 0x0b4a2a }));
       ring.scale.set(0.8, 1.4, 0.8); ring.position.y = 2.15;
       this.player.add(ring);
       this.plumbob = ring;
@@ -552,40 +615,51 @@
       else { const pl = this.places[s.place && !this.places[s.place].remote ? s.place : "home"]; p = pl.spot; }
       this.player.position.set(p.x, 0, p.z);
       this.player.rotation.y = Math.PI;
-      if (s.place === "home" && s.inside) this.enterHome(true);
+      const pl = s.place && this.places[s.place];
+      if (s.inside && pl && pl.kind === "building") this.enterRoom(s.place, true);
       this.snapCamera = true;
-    }
-    enterHome(silent) {
-      this.interior = true;
-      this.room.visible = true;
-      this.cityGroup.visible = false;
-      this.player.position.set(-3.6, 0, 400 + 0.6);
-      this.player.rotation.y = Math.PI / 2;
-      this.snapCamera = true;
-      if (!silent && this.hooks.onRoom) this.hooks.onRoom(true);
-    }
-    leaveInterior() { this.interior = false; this.room.visible = false; this.cityGroup.visible = true; }
-    exitHome() {
-      this.interior = false;
-      this.room.visible = false;
-      this.cityGroup.visible = true;
-      const p = this.places.home;
-      this.player.position.set(p.spot.x, 0, p.spot.z + 1);
-      this.player.rotation.y = 0;
-      this.sim.leave();
-      this.sim.setPos(p.spot.x, p.spot.z + 1);
-      this.snapCamera = true;
-      if (this.hooks.onRoom) this.hooks.onRoom(false);
     }
 
-    walkTo(placeId) {
-      const pos = this.player.position;
-      const pts = NAV.pathFromPoint(NAV.get(this.city), pos.x, pos.z, placeId);
-      const pl = this.places[placeId];
-      if (pl.kind === "building") pts.push({ x: pl.door.x, z: pl.door.z + (pl.side === "S" ? 1.2 : -1.2) });
-      else pts.push({ x: pl.spot.x, z: pl.spot.z });
-      this.autoPath = { pts, i: 1, place: placeId };
+    // ------------------------------------------------------------ walking
+    navNow() { return this.interior ? this.room.nav : this.cityNav; }
+    // Walk to a point (world coords) along a clear route, then call back.
+    goTo(x, z, onArrive, opts = {}) {
+      const p = this.player.position;
+      let pts = this.navNow().find(p.x, p.z, x, z);
+      if (!pts || !pts.length) pts = [{ x, z }];
+      this.walk = { pts, i: 0, onArrive, stop: opts.stop || 0, follow: opts.follow || null, tries: 0, run: opts.run };
+      this.seat = null;
+      if (opts.marker !== false) { const e = pts[pts.length - 1]; this.marker.position.set(e.x, 0.06, e.z); this.marker.visible = true; this.markerT = 1.2; }
+      return true;
     }
+    cancelWalk() { if (this.walk) { const w = this.walk; this.walk = null; this.marker.visible = false; if (w.onCancel) w.onCancel(); } }
+    isWalking() { return !!this.walk; }
+    // Walk to a venue's door (outdoors) or an open place's centre.
+    walkTo(placeId, onArrive) {
+      const pl = this.places[placeId];
+      if (!pl) return;
+      if (this.interior) this.exitRoom();
+      const t = pl.kind === "building" ? { x: pl.door.x, z: pl.door.z + (pl.side === "S" ? 1.2 : -1.2) } : { x: pl.spot.x, z: pl.spot.z };
+      this.goTo(t.x, t.z, () => { if (onArrive) onArrive(placeId); else if (this.hooks.onArrive) this.hooks.onArrive(placeId); }, { run: true });
+    }
+    // Walk up to a room object, ready to use it.
+    walkToObject(o, cb) {
+      if (!this.room || !o) return;
+      this.goTo(o.ap.x, o.ap.z + ROOM_Z, () => { this.player.rotation.y = o.face; if (cb) cb(o); });
+    }
+    // Walk up to a person (keeps following if they move).
+    walkToPerson(id, cb) {
+      const rec = this.people.get(id);
+      if (!rec || !rec.model.visible) { if (cb) cb(false); return; }
+      const m = rec.model.position;
+      const p = this.player.position;
+      const d = Math.hypot(m.x - p.x, m.z - p.z);
+      if (d < 1.8) { this.faceTowards(m); if (cb) cb(true); return; }
+      const ang = Math.atan2(p.x - m.x, p.z - m.z);
+      const tx = m.x + Math.sin(ang) * 1.3, tz = m.z + Math.cos(ang) * 1.3;
+      this.goTo(tx, tz, () => { this.faceTowards(rec.model.position); if (cb) cb(true); }, { follow: id, run: !this.interior });
+    }
+    faceTowards(v) { this.player.rotation.y = Math.atan2(v.x - this.player.position.x, v.z - this.player.position.z); }
 
     // ------------------------------------------------------------ input
     bindInput() {
@@ -595,69 +669,206 @@
         const k = e.key.toLowerCase();
         if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright", "shift"].includes(k)) {
           this.keys[k] = down;
-          if (down) { this.autoPath = null; e.preventDefault(); }
+          if (down && k !== "shift") { this.cancelWalk(); e.preventDefault(); }
         }
+        if (down && (k === "q" || k === "r")) this.camYawTarget = (this.camYawTarget || this.camYaw) + (k === "q" ? 1 : -1) * Math.PI / 4;
         if (down && (k === "e" || k === "enter") && !e.repeat) { if (this.hooks.onInteractKey) this.hooks.onInteractKey(); }
       };
       window.addEventListener("keydown", this.onKey);
       window.addEventListener("keyup", this.onKey);
       this.onBlur = () => { this.keys = {}; };
       window.addEventListener("blur", this.onBlur);
-      this.renderer.domElement.addEventListener("wheel", (e) => { e.preventDefault(); this.zoom = Math.max(0.55, Math.min(1.7, this.zoom * (e.deltaY > 0 ? 1.08 : 0.93))); }, { passive: false });
-      // Pinch to zoom.
-      let pinch = null;
-      this.renderer.domElement.addEventListener("touchstart", (e) => { if (e.touches.length === 2) pinch = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); }, { passive: true });
-      this.renderer.domElement.addEventListener("touchmove", (e) => {
-        if (e.touches.length === 2 && pinch) { const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); this.zoom = Math.max(0.55, Math.min(1.7, this.zoom * pinch / d)); pinch = d; }
+      const cv = this.renderer.domElement;
+      cv.addEventListener("wheel", (e) => { e.preventDefault(); this.zoom = Math.max(0.5, Math.min(1.7, this.zoom * (e.deltaY > 0 ? 1.08 : 0.93))); }, { passive: false });
+      cv.addEventListener("contextmenu", (e) => e.preventDefault());
+      // Click or tap to walk and to open interaction menus; right-drag to turn the camera.
+      let down = null, pinch = null;
+      cv.addEventListener("pointerdown", (e) => { down = { x: e.clientX, y: e.clientY, t: performance.now(), b: e.button, yaw: this.camYawTarget || this.camYaw, id: e.pointerId }; });
+      cv.addEventListener("pointermove", (e) => {
+        if (down && down.b !== 0 && e.pointerId === down.id) { this.camYawTarget = down.yaw - (e.clientX - down.x) / 160; this.camYaw = this.camYawTarget; return; }
+        if (!this.mobile && performance.now() - (this.hoverT || 0) > 70) { this.hoverT = performance.now(); this.hover = this.pickAt(e.clientX, e.clientY, true); cv.style.cursor = this.hover && this.hover.kind !== "ground" ? "pointer" : "default"; }
+      });
+      cv.addEventListener("pointerleave", () => { this.hover = null; });
+      cv.addEventListener("pointerup", (e) => {
+        const d = down; down = null;
+        if (!d || d.id !== e.pointerId || pinch) return;
+        if (d.b !== 0) return;
+        if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 10 || performance.now() - d.t > 600) return;
+        const pick = this.pickAt(e.clientX, e.clientY);
+        if (pick && this.hooks.onPick) this.hooks.onPick(pick, e.clientX, e.clientY);
+      });
+      // Pinch to zoom, two-finger twist to turn.
+      cv.addEventListener("touchstart", (e) => { if (e.touches.length === 2) { down = null; const [a, b] = e.touches; pinch = { d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), ang: Math.atan2(b.clientY - a.clientY, b.clientX - a.clientX), yaw: this.camYaw }; } }, { passive: true });
+      cv.addEventListener("touchmove", (e) => {
+        if (e.touches.length === 2 && pinch) {
+          const [a, b] = e.touches;
+          const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+          this.zoom = Math.max(0.5, Math.min(1.7, this.zoom * pinch.d / d)); pinch.d = d;
+          const ang = Math.atan2(b.clientY - a.clientY, b.clientX - a.clientX);
+          this.camYaw = this.camYawTarget = pinch.yaw - (ang - pinch.ang);
+        }
       }, { passive: true });
+      cv.addEventListener("touchend", (e) => { if (e.touches.length < 2) setTimeout(() => { pinch = null; }, 50); }, { passive: true });
     }
-    setJoystick(x, z) { this.joy.x = x; this.joy.z = z; if (x || z) this.autoPath = null; }
+    setJoystick(x, z) { this.joy.x = x; this.joy.z = z; if (x || z) this.cancelWalk(); }
+    // What's under the pointer: a person, an object, a building, yourself, or the ground.
+    pickAt(cx, cy, hoverOnly) {
+      const r = this.renderer.domElement.getBoundingClientRect();
+      const ndc = new THREE.Vector2(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
+      this.raycaster.setFromCamera(ndc, this.camera);
+      const list = [this.player];
+      for (const rec of this.people.values()) if (rec.model.visible) list.push(rec.model);
+      this.staff.forEach((st) => list.push(st.model));
+      if (this.interior && this.room) this.room.objects.forEach((o) => list.push(o.mesh));
+      else if (!hoverOnly || true) list.push(...this.pickables);
+      const hits = this.raycaster.intersectObjects(list, true);
+      for (const h of hits) {
+        let o = h.object;
+        while (o && !o.userData.pick && !o.userData.personId) o = o.parent;
+        if (!o) continue;
+        if (o.userData.personId) return { kind: o.userData.personKind || "person", id: o.userData.personId, point: h.point };
+        const pk = o.userData.pick;
+        if (pk.kind === "self" && hits.length > 1 && this.sim.s.activity) continue;
+        return { ...pk, point: h.point };
+      }
+      // Otherwise the floor.
+      const ray = this.raycaster.ray;
+      if (Math.abs(ray.direction.y) < 1e-4) return null;
+      const t = -ray.origin.y / ray.direction.y;
+      if (t < 0) return null;
+      const x = ray.origin.x + ray.direction.x * t, z = ray.origin.z + ray.direction.z * t;
+      if (this.interior && this.room && (Math.abs(x) > this.room.w / 2 || Math.abs(z - ROOM_Z) > this.room.d / 2 + 0.6)) return null;
+      return { kind: "ground", x, z };
+    }
 
     blockedAt(x, z) {
-      const list = this.interior ? this.roomColliders : this.colliders;
-      const ox = this.interior ? 0 : 0, oz = this.interior ? 400 : 0;
-      for (const c of list) if (x + PLAYER_R > c.x0 + ox && x - PLAYER_R < c.x1 + ox && z + PLAYER_R > c.z0 + oz && z - PLAYER_R < c.z1 + oz) return true;
+      if (this.interior) return this.room ? this.roomBlocked(x, z) : false;
+      for (const c of this.colliders) if (x + PLAYER_R > c.x0 && x - PLAYER_R < c.x1 && z + PLAYER_R > c.z0 && z - PLAYER_R < c.z1) return true;
+      return false;
+    }
+    roomBlocked(x, z) {
+      const R = PLAYER_R * 0.7;
+      for (const c of this.room.colliders) if (x + R > c.x0 && x - R < c.x1 && z - ROOM_Z + R > c.z0 && z - ROOM_Z - R < c.z1) return true;
       return false;
     }
 
     // ------------------------------------------------------------ per frame
+    // Keep the 3D scene in step with where the sim says you are.
+    syncRoom() {
+      const s = this.sim.s;
+      if (s.ride) { if (this.interior) this.leaveInterior(); return; }
+      const pl = s.place && this.places[s.place];
+      const wantRoom = s.inside && pl && pl.kind === "building";
+      if (wantRoom && this.interiorPlace !== s.place) this.enterRoom(s.place, true);
+      else if (!wantRoom && this.interior) {
+        const id = this.interiorPlace;
+        this.leaveInterior();
+        const p = this.places[id] || this.places.home;
+        const dz = p.side === "S" ? 1.4 : -1.4;
+        this.player.position.set(p.door.x, 0, p.door.z + dz);
+        this.sim.setPos(p.door.x, p.door.z + dz);
+        this.snapCamera = true;
+        if (this.hooks.onRoom) this.hooks.onRoom(false, id);
+      } else if (this.interiorPlace === "home" && this.homeKey !== JSON.stringify(s.home) && !s.activity) {
+        const pos = this.player.position.clone();
+        this.enterRoom("home", true);
+        this.player.position.copy(pos);
+      }
+    }
+    // When an activity starts in a room, sit or stand at the thing you're using.
+    updateSeat() {
+      const s = this.sim.s, a = s.activity;
+      const key = a ? a.id + ":" + a.start : null;
+      if (key !== this.actKey) {
+        if (!a && this.seat) this.standUp();
+        this.actKey = key;
+        this.seat = null;
+        if (a && a.id !== "social" && this.interior && this.room) {
+          const p = this.player.position;
+          const objs = this.room.objects.filter((o) => o.act.includes(a.id));
+          let obj = null, bd = Infinity;
+          for (const o of objs) { const d = Math.hypot(o.ap.x - p.x, o.ap.z + ROOM_Z - p.z); if (d < bd) { bd = d; obj = o; } }
+          if (obj) {
+            const taken = new Set([...this.assign.values()].map((sl) => sl.key));
+            let seat = null, sd = Infinity;
+            (obj.seats || []).forEach((st, i) => { if (taken.has(obj.x + ":" + obj.z + ":" + i)) return; const d = Math.hypot(st[0] - p.x, st[1] + ROOM_Z - p.z); if (d < sd) { sd = d; seat = st; } });
+            this.seat = seat ? { x: seat[0], z: seat[1] + ROOM_Z, rot: seat[2], pose: seat[3], obj } : { x: obj.ap.x, z: obj.ap.z + ROOM_Z, rot: obj.face, pose: "stand", obj };
+            this.seat.stand = { x: obj.ap.x, z: obj.ap.z + ROOM_Z };
+            this.walk = null; this.marker.visible = false;
+          }
+        }
+      }
+      if (this.seat && a) {
+        const st = this.seat;
+        if (st.pose === "lie") this.player.position.set(st.x + Math.sin(st.rot) * 1.45, 0, st.z + Math.cos(st.rot) * 1.45);
+        else this.player.position.set(st.x, 0, st.z);
+        this.player.rotation.y = st.rot;
+      }
+    }
+    standUp() {
+      const st = this.seat;
+      this.seat = null;
+      if (st && st.stand) this.player.position.set(st.stand.x, 0, st.stand.z);
+      this.player.rotation.x = 0;
+    }
+
     update(dt, realDt) {
       this.time += realDt;
       const s = this.sim.s;
-      const busy = !!(s.activity || s.ride || s.event || s.convo || s.over);
-      const hidden = !!s.ride || (s.activity && !this.interior && this.places[s.activity.place] && this.places[s.activity.place].kind === "building");
-      this.player.visible = !hidden;
-      if (s.ride === null && this.wasRiding && s.pos) { this.player.position.set(s.pos.x, 0, s.pos.z); this.snapCamera = true; this.leaveInterior(); }
+      this.syncRoom();
+      if (s.ride === null && this.wasRiding && s.pos) { this.leaveInterior(); this.player.position.set(s.pos.x, 0, s.pos.z); this.snapCamera = true; }
       this.wasRiding = !!s.ride;
       this.refreshLook();
+      this.updateSeat();
 
-      // Movement.
-      let mx = 0, mz = 0;
-      if (!busy && !this.frozen) {
-        if (this.keys.w || this.keys.arrowup) mz -= 1;
-        if (this.keys.s || this.keys.arrowdown) mz += 1;
-        if (this.keys.a || this.keys.arrowleft) mx -= 1;
-        if (this.keys.d || this.keys.arrowright) mx += 1;
-        mx += this.joy.x; mz += this.joy.z;
-        if (!mx && !mz && this.autoPath) {
-          const ap = this.autoPath;
-          const tgt = ap.pts[ap.i];
-          const dx = tgt.x - this.player.position.x, dz = tgt.z - this.player.position.z;
-          const dist = Math.hypot(dx, dz);
-          if (dist < 0.6) { ap.i++; if (ap.i >= ap.pts.length) { const pl = ap.place; this.autoPath = null; if (this.hooks.onArrive) this.hooks.onArrive(pl); } }
-          else { mx = dx / dist; mz = dz / dist; }
+      // Movement: keys or joystick, or following a clicked route.
+      let mx = 0, mz = 0, kx = 0, kz = 0;
+      const blocked = !!(s.ride || s.event || s.convo || s.over || this.frozen);
+      if (!blocked) {
+        if (this.keys.w || this.keys.arrowup) kz -= 1;
+        if (this.keys.s || this.keys.arrowdown) kz += 1;
+        if (this.keys.a || this.keys.arrowleft) kx -= 1;
+        if (this.keys.d || this.keys.arrowright) kx += 1;
+        kx += this.joy.x; kz += this.joy.z;
+        // Walking away stops what you're doing (except sleep).
+        if ((Math.abs(kx) > 0.2 || Math.abs(kz) > 0.2) && s.activity && s.activity.id !== "sleep") { this.sim.cancelActivity(); if (this.hooks.onCancel) this.hooks.onCancel(); }
+        if (!s.activity) {
+          const c = Math.cos(this.camYaw), sn = Math.sin(this.camYaw);
+          mx = kx * c + kz * sn; mz = -kx * sn + kz * c;
+          if (!mx && !mz && this.walk) {
+            const w = this.walk;
+            // Following someone who moved? Re-route.
+            if (w.follow && w.i === w.pts.length - 1 && w.tries < 4) {
+              const rec = this.people.get(w.follow), end = w.pts[w.pts.length - 1];
+              if (rec && Math.hypot(rec.model.position.x - end.x, rec.model.position.z - end.z) > 2.4) {
+                w.tries++;
+                const m = rec.model.position, p = this.player.position, ang = Math.atan2(p.x - m.x, p.z - m.z);
+                const pts = this.navNow().find(p.x, p.z, m.x + Math.sin(ang) * 1.3, m.z + Math.cos(ang) * 1.3);
+                if (pts) { w.pts = pts; w.i = 0; }
+              }
+            }
+            const tgt = w.pts[w.i];
+            const dx = tgt.x - this.player.position.x, dz = tgt.z - this.player.position.z;
+            const dist = Math.hypot(dx, dz);
+            const last = w.i === w.pts.length - 1;
+            if (dist < (last ? 0.25 : 0.5)) {
+              w.i++;
+              if (w.i >= w.pts.length) { this.walk = null; this.marker.visible = false; if (w.onArrive) w.onArrive(); }
+            } else { mx = dx / dist; mz = dz / dist; if (last && dist < 0.8) { mx *= Math.max(0.35, dist / 0.8); mz *= Math.max(0.35, dist / 0.8); } }
+          }
         }
       }
       const len = Math.hypot(mx, mz);
-      let moving = false;
+      let moving = false, run = false;
       if (len > 0.05) {
-        mx /= Math.max(1, len); mz /= Math.max(1, len);
-        const run = (this.keys.shift || this.autoPath) && s.needs.energy > 15;
-        const sp = (run ? RUN : WALK) * realDt;
+        if (len > 1) { mx /= len; mz /= len; }
+        run = (this.keys.shift || (this.walk && this.walk.run && !this.interior)) && s.needs.energy > 15;
+        const sp = (run ? RUN : this.interior ? WALK * 0.75 : WALK) * realDt;
         const p = this.player.position;
         const nx = p.x + mx * sp, nz = p.z + mz * sp;
-        if (!this.blockedAt(nx, p.z)) p.x = nx;
-        if (!this.blockedAt(p.x, nz)) p.z = nz;
+        const free = (x, z) => !this.blockedAt(x, z);
+        if (this.walk) { p.x = nx; p.z = nz; } // routes are already clear
+        else { if (free(nx, p.z)) p.x = nx; if (free(p.x, nz)) p.z = nz; }
         const want = Math.atan2(mx, mz);
         let d = want - this.player.rotation.y;
         while (d > Math.PI) d -= Math.PI * 2;
@@ -669,42 +880,67 @@
           if (this.posTimer > 0.1) { this.posTimer = 0; this.sim.setPos(p.x, p.z); }
         }
       }
-      this.animate(this.player, moving, realDt, s.activity && ["party", "dance", "owambe_attend", "concert", "beach_party"].includes(s.activity.id));
+
+      // Pose.
+      const a = s.activity;
+      let pose = moving ? (run ? "run" : "walk") : "stand", seated = false;
+      if (!moving && a) {
+        if (a.id === "social") {
+          pose = "talk";
+          const rec = this.people.get(a.with);
+          if (rec && rec.model.visible) { const m = rec.model.position; const want = Math.atan2(m.x - this.player.position.x, m.z - this.player.position.z); this.player.rotation.y += (want - this.player.rotation.y) * Math.min(1, realDt * 8); }
+        } else if (this.seat) { pose = Poses.seatedPose(a.pose, this.seat.pose); seated = this.seat.pose === "sit"; }
+        else pose = a.pose || "stand";
+      }
+      if (!moving && !a && this.approachHold && this.approachHold.until > this.time) pose = "talk";
+      this.player.visible = !s.ride && !(a && a.pose === "hide" && (this.seat || !this.interior));
+      this.player.userData.phase += realDt * (moving ? (run ? 11 : 8.5) : pose === "dance" ? 6.5 : pose === "workout" ? 10 : 2.4);
+      const yOff = Poses.apply(this.player, pose === "hide" ? "stand" : pose, this.player.userData.phase, { seated });
+      this.player.position.y = yOff;
       this.plumbob.rotation.y += realDt * 2;
       this.plumbob.position.y = 2.15 + Math.sin(this.time * 2.4) * 0.06;
       const mood = this.sim.mood();
       this.plumbob.material.color.setHex(mood >= 55 ? 0x20b46e : mood >= 30 ? 0xf2b632 : 0xe5484d);
+      this.plumbob.material.emissive.setHex(mood >= 55 ? 0x0b4a2a : mood >= 30 ? 0x4a3a0b : 0x4a0b0b);
+      if (this.marker.visible) { this.markerT -= realDt; this.marker.material.opacity = Math.max(0, Math.min(0.9, this.markerT + 0.4)); this.marker.scale.setScalar(1 + Math.sin(this.time * 6) * 0.08); }
 
-      // Camera.
+      // Camera: orbit with Q/R or right-drag; rooms get the Sims cutaway view.
+      if (this.camYawTarget !== undefined) this.camYaw += (this.camYawTarget - this.camYaw) * Math.min(1, realDt * 6);
       const tgt = this.player.position;
-      const off = this.interior ? new THREE.Vector3(6, 13, 13.5) : new THREE.Vector3(0, 34, 29).multiplyScalar(this.zoom);
-      const want = tgt.clone().add(off);
+      const cy = Math.cos(this.camYaw), sy = Math.sin(this.camYaw);
+      let base, look;
+      if (this.interior && this.room) {
+        const fit = this.camera.aspect < 1.1 ? Math.pow(1.1 / Math.max(0.45, this.camera.aspect), 0.42) : 1;
+        const k = Math.pow(Math.max(this.room.w / 12, this.room.d / 10), 0.85) * this.zoom * fit;
+        base = new THREE.Vector3(6, 13, 13.5).multiplyScalar(k);
+        look = new THREE.Vector3(lerp(tgt.x, 0, 0.45), 0.6, lerp(tgt.z, ROOM_Z, 0.45));
+      } else {
+        base = new THREE.Vector3(0, 34, 29).multiplyScalar(this.zoom);
+        look = new THREE.Vector3(tgt.x, 1.2, tgt.z);
+      }
+      const off = new THREE.Vector3(base.x * cy + base.z * sy, base.y, -base.x * sy + base.z * cy);
+      const want = look.clone().add(off);
       if (this.snapCamera) { this.camera.position.copy(want); this.snapCamera = false; }
       else this.camera.position.lerp(want, Math.min(1, realDt * 4));
-      if (this.interior) this.camera.lookAt(lerp(tgt.x, 0, 0.6), 0.5, lerp(tgt.z, 400, 0.6)); else this.camera.lookAt(tgt.x, tgt.y + 1.2, tgt.z);
+      this.camera.lookAt(look);
+      if (this.interior && this.room) {
+        const ox = off.x, oz = off.z, ol = Math.hypot(ox, oz) || 1;
+        this.room.walls.forEach((m) => {
+          const wl = m.userData.wall;
+          const low = (wl.nx * ox + wl.nz * oz) / ol > 0.25;
+          const sc = low ? 0.08 : 1;
+          m.scale.y += (sc - m.scale.y) * Math.min(1, realDt * 8);
+          m.position.y = (wl.h * m.scale.y) / 2;
+        });
+        Rooms.animate(this.room, this.time);
+      }
 
       this.updatePeople(realDt);
+      this.updateBubbles(realDt);
       this.updateAmbient(realDt);
       this.findTarget();
       this.updateLabels();
       this.renderer.render(this.scene, this.camera);
-    }
-
-    animate(model, moving, dt, dancing) {
-      const L = model.userData.limbs;
-      model.userData.phase = (model.userData.phase || 0) + dt * (moving ? 9 : dancing ? 7 : 1.6);
-      const ph = model.userData.phase;
-      if (!L) return;
-      const swing = moving ? Math.sin(ph) * 0.65 : 0;
-      if (L.legs[0]) { L.legs[0].rotation.x = swing; L.legs[1].rotation.x = -swing; }
-      if (L.arms[0]) {
-        const armSwing = moving ? -swing * 0.8 : dancing ? Math.sin(ph) * 1.2 - 1.2 : Math.sin(ph) * 0.03;
-        L.arms[0].rotation.x = armSwing; L.arms[1].rotation.x = dancing ? Math.sin(ph + 1.5) * 1.2 - 1.2 : moving ? swing * 0.8 : -armSwing;
-        L.arms[0].rotation.z = dancing ? -0.4 : 0; L.arms[1].rotation.z = dancing ? 0.4 : 0;
-      }
-      model.children.forEach((c) => { if (c.userData && c.userData.bob) c.position.y = c.userData.bob; });
-      const bounce = moving ? Math.abs(Math.sin(ph)) * 0.05 : dancing ? Math.abs(Math.sin(ph)) * 0.12 : 0;
-      model.userData.bounce = bounce;
     }
 
     lookFor(id) {
@@ -713,42 +949,146 @@
       const st = this.sim.s.strangers.find((x) => x.id === id);
       return st ? { look: st.look, name: st.name, lite: true } : null;
     }
+    personRec(id) {
+      let rec = this.people.get(id);
+      if (rec) return rec;
+      const info = this.lookFor(id);
+      if (!info) return null;
+      const model = Avatar3D.build(info.look, { lite: info.lite });
+      model.scale.multiplyScalar(HUMAN);
+      model.rotation.order = "YXZ";
+      model.userData.personId = id;
+      model.userData.phase = Math.random() * 6;
+      const sh = new THREE.Mesh(new THREE.CircleGeometry(0.4, 12), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.18 }));
+      sh.rotation.x = -Math.PI / 2; sh.position.y = 0.02; model.add(sh);
+      this.shadowify(model);
+      this.scene.add(model);
+      rec = { model, name: info.name, kind: "person" };
+      this.people.set(id, rec);
+      return rec;
+    }
+    // Seats and standing spots inside the current room.
+    roomSlots() {
+      const r = this.room;
+      if (r.slots) return r.slots;
+      const slots = [];
+      r.objects.forEach((o) => (o.seats || []).forEach((st, i) => slots.push({ key: o.x + ":" + o.z + ":" + i, x: st[0], z: st[1], rot: st[2], pose: st[3], obj: o })));
+      // Standing spots for chatting in small groups.
+      let k = r.w * 31 + r.d;
+      const rnd = () => { k = (k * 9301 + 49297) % 233280; return k / 233280; };
+      for (let n = 0, tries = 0; n < 10 && tries < 200; tries++) {
+        const x = (rnd() - 0.5) * (r.w - 3), z = (rnd() - 0.5) * (r.d - 3);
+        if (!r.nav.freeAt(x, z + ROOM_Z) || Math.hypot(x, z - r.d / 2) < 2.2) continue;
+        slots.push({ key: "st" + n, x, z, rot: Math.atan2(-x, -z) + (rnd() - 0.5), pose: "talk", obj: null });
+        n++;
+      }
+      r.slots = slots;
+      return slots;
+    }
+    slotFor(id) {
+      if (this.assign.has(id)) return this.assign.get(id);
+      const def = W.NPCS.find((n) => n.id === id);
+      let slot = null;
+      if (def && def.vendor) {
+        const o = this.room.objects.find((x) => x.vendorSpot);
+        if (o) slot = { key: "v:" + id, x: o.vendorSpot[0], z: o.vendorSpot[1], rot: o.vendorSpot[2], pose: "stand", obj: o };
+        else slot = { key: "v:" + id, x: 1.6, z: this.room.d / 2 - 1.6, rot: Math.PI, pose: "stand", obj: null };
+      } else {
+        const taken = new Set([...this.assign.values()].map((sl) => sl.key));
+        const free = this.roomSlots().filter((sl) => !taken.has(sl.key));
+        if (free.length) {
+          let h = 0;
+          for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+          slot = free[h % free.length];
+        } else slot = { key: "x:" + id, x: (Math.random() - 0.5) * 4, z: 0, rot: 0, pose: "talk", obj: null };
+      }
+      this.assign.set(id, slot);
+      return slot;
+    }
+    npcPose(slot, id) {
+      const pl = this.places[this.interiorPlace];
+      const p = slot.pose;
+      if (p === "sit" && slot.obj && slot.obj.k === "table") {
+        const eatery = ["mamaput", "fastfood", "restaurant", "cafe", "hall", "family"].includes(pl.type);
+        const flip = Math.floor(this.time / 7 + id.length) % 3;
+        return { pose: eatery && flip !== 2 ? "eat" : "talk", seated: true };
+      }
+      if (p === "sit" && slot.obj && ["salonchair", "dryer", "desk"].includes(slot.obj.k)) return { pose: slot.obj.k === "desk" ? "talk" : "phone", seated: true };
+      if (p === "sit") return { pose: Math.floor(this.time / 9 + id.length) % 4 === 0 ? "phone" : "sit", seated: true };
+      if (p === "drink") return { pose: "drink", seated: false };
+      return { pose: p, seated: false };
+    }
 
     updatePeople(dt) {
       const s = this.sim.s;
       const seen = new Set();
-      if (!this.interior) {
-        const cam = this.player.position;
+      const appr = s.approach;
+      const pp = this.player.position;
+      const talkTo = s.activity && s.activity.id === "social" ? s.activity.with : null;
+      const place = (rec, x, z, heading, pose, seated, snapFar) => {
+        const m = rec.model;
+        const dx = x - m.position.x, dz = z - m.position.z;
+        const dist = Math.hypot(dx, dz);
+        if (dist > (snapFar || 8)) { m.position.x = x; m.position.z = z; }
+        else { m.position.x += dx * Math.min(1, dt * 6); m.position.z += dz * Math.min(1, dt * 6); }
+        let d = heading - m.rotation.y;
+        while (d > Math.PI) d -= Math.PI * 2;
+        while (d < -Math.PI) d += Math.PI * 2;
+        m.rotation.y += d * Math.min(1, dt * 6);
+        m.userData.phase += dt * (pose === "walk" ? 8.5 : pose === "dance" ? 6 + (m.userData.phase % 1) : pose === "workout" ? 10 : 2.2);
+        m.position.y = Poses.apply(m, pose, m.userData.phase, { seated });
+        m.visible = true;
+        rec.x = m.position.x; rec.z = m.position.z;
+      };
+      // Someone walking over to you, then chatting for a moment.
+      const approaching = (id, rec) => {
+        if (appr && appr.id === id) {
+          const m = rec.model.position;
+          const d = Math.hypot(pp.x - m.x, pp.z - m.z);
+          const head = Math.atan2(pp.x - m.x, pp.z - m.z);
+          if (d > 1.35) { const sp = Math.min(d - 1.3, dt * 2.6); m.x += Math.sin(head) * sp; m.z += Math.cos(head) * sp; rec.model.rotation.y = head; rec.model.userData.phase += dt * 8.5; rec.model.position.y = Poses.apply(rec.model, "walk", rec.model.userData.phase); }
+          else { this.sim.resolveApproach(); this.approachHold = { id, until: this.time + 3.2 }; this.faceTowards(m); }
+          rec.model.visible = true;
+          return true;
+        }
+        if (this.approachHold && this.approachHold.id === id && this.approachHold.until > this.time) {
+          const m = rec.model.position;
+          rec.model.rotation.y = Math.atan2(pp.x - m.x, pp.z - m.z);
+          rec.model.userData.phase += dt * 2.4;
+          rec.model.position.y = Poses.apply(rec.model, "talk", rec.model.userData.phase);
+          rec.model.visible = true;
+          return true;
+        }
+        return false;
+      };
+      if (this.interior && this.room) {
+        for (const id of this.sim.peopleAt(this.interiorPlace)) {
+          const rec = this.personRec(id);
+          if (!rec) continue;
+          seen.add(id);
+          if (approaching(id, rec)) continue;
+          const sl = this.slotFor(id);
+          const np = this.npcPose(sl, id);
+          let heading = sl.rot, pose = np.pose;
+          if (id === talkTo) { heading = Math.atan2(pp.x - sl.x, pp.z - ROOM_Z - sl.z); if (!np.seated) pose = "talk"; }
+          const lie = sl.pose === "lie";
+          place(rec, sl.x + (lie ? Math.sin(sl.rot) * 1.45 : 0), sl.z + ROOM_Z + (lie ? Math.cos(sl.rot) * 1.45 : 0), heading, pose, np.seated, 3);
+        }
+        for (const id of [...this.assign.keys()]) if (!seen.has(id)) this.assign.delete(id);
+        const open = W.isOpen(this.places[this.interiorPlace].type, s.t);
+        this.staff.forEach((st) => { st.model.visible = open; st.model.userData.phase = (st.model.userData.phase || 0) + dt * (st.pose === "dance" ? 6 : 2.2); st.model.position.y = Poses.apply(st.model, st.pose, st.model.userData.phase); });
+      } else {
+        const party = (pl) => pl && ["club", "concert", "hall"].includes(pl) && this.sim.clock().hh >= 15;
         for (const p of this.sim.peoplePositions()) {
-          if (Math.hypot(p.x - cam.x, p.z - cam.z) > 60) continue;
+          if (Math.hypot(p.x - pp.x, p.z - pp.z) > 60) continue;
+          const rec = this.personRec(p.id);
+          if (!rec) continue;
           seen.add(p.id);
-          let rec = this.people.get(p.id);
-          if (!rec) {
-            const info = this.lookFor(p.id);
-            if (!info) continue;
-            const model = Avatar3D.build(info.look, { lite: info.lite });
-            model.scale.multiplyScalar(HUMAN);
-            const sh = new THREE.Mesh(new THREE.CircleGeometry(0.4, 12), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.18 }));
-            sh.rotation.x = -Math.PI / 2; sh.position.y = 0.02; model.add(sh);
-            model.position.set(p.x, 0, p.z);
-            this.shadowify(model);
-            this.scene.add(model);
-            rec = { model, name: info.name, kind: "person" };
-            this.people.set(p.id, rec);
-          }
-          const m = rec.model;
-          const dx = p.x - m.position.x, dz = p.z - m.position.z;
-          const far = Math.hypot(dx, dz) > 8;
-          if (far) m.position.set(p.x, 0, p.z);
-          else { m.position.x += dx * Math.min(1, dt * 6); m.position.z += dz * Math.min(1, dt * 6); }
-          let d = p.heading - m.rotation.y;
-          while (d > Math.PI) d -= Math.PI * 2;
-          while (d < -Math.PI) d += Math.PI * 2;
-          m.rotation.y += d * Math.min(1, dt * 6);
-          const party = !p.walking && p.place && ["club", "concert", "hall"].includes(p.place) && this.sim.clock().hh >= 15;
-          this.animate(m, p.walking && Math.hypot(dx, dz) > 0.002, dt * (this.sim.speedNow() > 1 ? 1.5 : 1), party);
-          m.visible = true;
-          rec.x = p.x; rec.z = p.z;
+          if (approaching(p.id, rec)) continue;
+          let heading = p.heading, pose = p.walking ? "walk" : party(p.place) ? "dance" : "stand";
+          if (p.id === talkTo) { heading = Math.atan2(pp.x - p.x, pp.z - p.z); pose = "talk"; }
+          else if (!p.walking && pose === "stand" && Math.floor(this.time / 6 + p.id.length) % 3 === 0) pose = "talk";
+          place(rec, p.x, p.z, heading, pose, false);
         }
         // Real players stand at their places.
         (this.hooks.remotePlayers ? this.hooks.remotePlayers() : []).forEach((rp, i) => {
@@ -760,21 +1100,43 @@
           if (!rec) {
             const model = Avatar3D.build(rp.look, { lite: true });
             model.scale.multiplyScalar(HUMAN);
+            model.rotation.order = "YXZ";
+            model.userData.personId = rp.username;
+            model.userData.personKind = "player";
+            model.userData.phase = 0;
             model.position.set(pl.spot.x + ((i % 3) - 1) * 1.6, 0, pl.spot.z + 1.6 + Math.floor(i / 3));
-            model.rotation.y = 0;
             this.scene.add(model);
             rec = { model, name: "@" + rp.username, kind: "player", username: rp.username };
             this.people.set(key, rec);
           }
           rec.x = rec.model.position.x; rec.z = rec.model.position.z;
           rec.model.visible = true;
-          this.animate(rec.model, false, dt, false);
+          rec.model.userData.phase += dt * 2.2;
+          rec.model.position.y = Poses.apply(rec.model, "stand", rec.model.userData.phase);
         });
+        this.staff.forEach((st) => { st.model.visible = false; });
       }
       for (const [id, rec] of this.people) if (!seen.has(id)) {
         rec.model.visible = false;
-        if (this.people.size > 70) { this.scene.remove(rec.model); this.people.delete(id); }
+        if (this.people.size > 80) { this.scene.remove(rec.model); this.people.delete(id); }
       }
+    }
+
+    // Speech bubbles from the sim, plus background chatter between people.
+    updateBubbles(dt) {
+      const now = this.time;
+      for (const b of this.sim.bubbles.splice(0)) this.bubbles.set(b.who, { text: b.text, until: now + (b.kind === "reply" ? 3.2 : 2.6), kind: b.kind });
+      this.chatT += dt;
+      if (this.chatT > 1.1) {
+        this.chatT = 0;
+        const vis = [...this.people.entries()].filter(([, r]) => r.model.visible && r.kind === "person");
+        if (vis.length >= 2) {
+          const [id, rec] = vis[Math.floor(Math.random() * vis.length)];
+          const near = vis.some(([id2, r2]) => id2 !== id && Math.hypot(r2.model.position.x - rec.model.position.x, r2.model.position.z - rec.model.position.z) < 3.6);
+          if (near && !this.bubbles.has(id)) this.bubbles.set(id, { text: CHATTER[Math.floor(Math.random() * CHATTER.length)], until: now + 2.2, kind: "chat" });
+        }
+      }
+      for (const [k, b] of this.bubbles) if (b.until < now) this.bubbles.delete(k);
     }
 
     updateAmbient(dt) {
@@ -784,11 +1146,11 @@
       const sky = this.interior ? new THREE.Color(0x1d1a24) : skyAt(h);
       this.scene.background = sky;
       this.scene.fog.color = sky;
-      const day = daylight(h);
+      const day = this.interior ? 1 : daylight(h);
       // Night keeps a cool moonlit fill so the streets stay readable.
-      this.hemi.intensity = 0.62 + day * 0.33;
+      this.hemi.intensity = this.interior ? (this.room && this.room.dark ? 0.32 : 0.78) : 0.62 + day * 0.33;
       this.hemi.color.setRGB(lerp(0.62, 1, day), lerp(0.7, 1, day), lerp(1, 1, day));
-      this.sun.intensity = 0.22 + day * 0.58;
+      this.sun.intensity = this.interior ? (this.room && this.room.dark ? 0.08 : 0.42) : 0.22 + day * 0.58;
       this.sun.color.setRGB(lerp(0.6, 1, day), lerp(0.68, 0.97, day), lerp(0.95, 0.92, day));
       const pp = this.player.position;
       this.sun.position.set(pp.x + Math.cos((h / 24) * Math.PI * 2 - Math.PI / 2) * 50, 45 + day * 25, pp.z + 35);
@@ -854,33 +1216,41 @@
       this.fireworks.push({ pts, life: 1.6 });
     }
 
-    // What the player can interact with right now.
+    // What the player can interact with right now (for the E key and the ✋ button).
     findTarget() {
       const s = this.sim.s;
-      if (s.activity || s.ride || s.event || s.convo || s.over) { this.target = null; return; }
+      if (s.ride || s.event || s.convo || s.over || (s.activity && s.activity.id === "sleep")) { this.target = null; return; }
       const p = this.player.position;
       let best = null, bd = Infinity;
       const consider = (t, d) => { if (d < bd) { bd = d; best = t; } };
-      if (this.interior) {
-        for (const o of this.roomObjects) consider({ kind: "object", id: o.action, label: o.label, x: o.x, z: o.z + 400 }, Math.hypot(o.x - p.x, o.z + 400 - p.z) - 0.4);
-        if (bd > 1.8) best = null;
-        this.target = best;
-        return;
-      }
       for (const [id, rec] of this.people) {
         if (!rec.model.visible) continue;
         const d = Math.hypot(rec.model.position.x - p.x, rec.model.position.z - p.z);
-        if (d < 2.4) consider({ kind: rec.kind, id: rec.kind === "player" ? rec.username : id, label: `Talk to ${rec.name}`, x: rec.model.position.x, z: rec.model.position.z }, d - 0.6);
+        if (d < 2.4) consider({ kind: rec.kind, id: rec.kind === "player" ? rec.username : id, label: rec.name, x: rec.model.position.x, z: rec.model.position.z }, d - 0.6);
+      }
+      if (this.interior && this.room) {
+        for (const o of this.room.objects) {
+          const d = Math.hypot(o.ap.x - p.x, o.ap.z + ROOM_Z - p.z);
+          if (d < 1.7) consider({ kind: "object", obj: o, label: `${o.icon || ""} ${o.label || ""}`.trim(), x: o.x, z: o.z + ROOM_Z }, d - 0.3);
+        }
+        this.target = best;
+        return;
       }
       for (const pl of Object.values(this.places)) {
         if (pl.remote) continue;
         const d = pl.kind === "building" ? Math.hypot(pl.door.x - p.x, pl.door.z - p.z) : Math.max(Math.abs(pl.x - p.x) - pl.w / 2, Math.abs(pl.z - p.z) - pl.d / 2, 0) + 0.5;
-        if (d < 3.2) consider({ kind: "place", id: pl.id, label: pl.kind === "building" ? `Enter ${pl.id === "home" ? "your flat" : pl.name}` : `${pl.icon} ${pl.name}`, x: pl.door.x, z: pl.door.z }, d < 2.2 ? d - 1.5 : d);
+        if (d < 3.2) consider({ kind: "place", id: pl.id, label: pl.kind === "building" ? (pl.id === "home" ? "Your flat" : pl.name) : `${pl.icon} ${pl.name}`, x: pl.door.x, z: pl.door.z }, d < 2.2 ? d - 1.5 : d);
       }
       this.target = best;
     }
+    // Screen position of a target (for opening its menu with the keyboard).
+    screenOf(x, y, z) {
+      const v = new THREE.Vector3(x, y, z).project(this.camera);
+      const r = this.renderer.domElement.getBoundingClientRect();
+      return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
+    }
 
-    // Floating labels: place names from afar, people's names up close.
+    // Floating labels: place names, people's names, speech bubbles, hover hints.
     updateLabels() {
       const live = new Set();
       const w = this.el.clientWidth, h = this.el.clientHeight;
@@ -892,29 +1262,45 @@
         let el = this.labels.get(key);
         if (!el) { el = document.createElement("div"); this.labelLayer.appendChild(el); this.labels.set(key, el); }
         if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; }
-        el.className = "wl " + cls;
+        if (el.dataset.cls !== cls) { el.className = "wl " + cls; el.dataset.cls = cls; }
         el.style.transform = `translate(${((v.x + 1) / 2) * w}px, ${((1 - v.y) / 2) * h}px) translate(-50%, -100%)`;
       };
+      const p = this.player.position;
       if (!this.interior) {
-        const p = this.player.position;
         for (const pl of Object.values(this.places)) {
           if (pl.remote) continue;
           const d = Math.hypot(pl.x - p.x, pl.z - p.z);
           if (d > 55 || d < 9) continue;
-          show("pl:" + pl.id, pl.x, (pl.h || 2) + 3.2, pl.z, `${pl.icon} ${escapeHtml(pl.id === "home" ? "Your Flat" : pl.name)}`, "wl-place");
-        }
-        for (const [id, rec] of this.people) {
-          if (!rec.model.visible) continue;
-          const d = Math.hypot(rec.model.position.x - p.x, rec.model.position.z - p.z);
-          if (d > 11) continue;
-          const st = this.sim.whoState(id);
-          const rel = rec.kind === "player" ? "Real player" : st && st.met ? this.sim.relLevel(id) : "";
-          show("pp:" + id, rec.model.position.x, 3.6, rec.model.position.z, `${escapeHtml(rec.name)}${rel ? ` <i>${rel}</i>` : ""}`, rec.kind === "player" ? "wl-player" : "wl-person");
+          const open = pl.kind === "building" && W.TYPES[pl.type].hours !== null ? (W.isOpen(pl.type, this.sim.s.t) ? "" : " · closed") : "";
+          show("pl:" + pl.id, pl.x, (pl.h || 2) + 3.2, pl.z, `${pl.icon} ${escapeHtml(pl.id === "home" ? "Your Flat" : pl.name)}<i>${open}</i>`, "wl-place");
         }
       }
-      if (this.target && this.target.kind !== "player") {
-        show("target", this.target.x, this.interior ? 1.6 : 3.8, this.target.z, `<b>${this.mobile ? "Tap ✋" : "E"}</b> ${escapeHtml(this.target.label)}`, "wl-target");
-      } else if (this.target) show("target", this.target.x, 3.8, this.target.z, `<b>${this.mobile ? "Tap ✋" : "E"}</b> ${escapeHtml(this.target.label)}`, "wl-target");
+      for (const [id, rec] of this.people) {
+        if (!rec.model.visible) continue;
+        const d = Math.hypot(rec.model.position.x - p.x, rec.model.position.z - p.z);
+        const st = this.sim.whoState(id);
+        const known = rec.kind === "player" || (st && st.met) || (this.hover && this.hover.id === id);
+        if (d > (this.interior ? (known ? 9 : 4.5) : (known ? 11 : 6))) continue;
+        const rel = rec.kind === "player" ? "Real player" : st && st.met ? this.sim.relLevel(id) : "";
+        const mood = st && st.mood && st.mood.until > this.sim.s.t ? " 😠" : "";
+        show("pp:" + id, rec.model.position.x, 3.5 + rec.model.position.y, rec.model.position.z, `${escapeHtml(rec.name)}${mood}${rel ? ` <i>${rel}</i>` : ""}`, rec.kind === "player" ? "wl-player" : "wl-person");
+      }
+      // Speech bubbles.
+      for (const [who, b] of this.bubbles) {
+        const m = who === "me" ? this.player : this.people.get(who) && this.people.get(who).model;
+        if (!m || !m.visible) continue;
+        const lying = Math.abs(m.rotation.x) > 1;
+        show("b:" + who, m.position.x, lying ? m.position.y + 1.4 : 4.35 + m.position.y, m.position.z, `<span>${escapeHtml(b.text)}</span>`, "wl-bubble " + (b.kind || ""));
+      }
+      // What's under the mouse.
+      const hv = this.hover;
+      if (hv && hv.kind !== "ground" && hv.kind !== "self" && hv.point) {
+        let label = "";
+        if (hv.kind === "object") label = `${hv.obj.icon || ""} ${hv.obj.label || ""}`;
+        else if (hv.kind === "place") { const pl = this.places[hv.id]; label = `${pl.icon} ${pl.id === "home" ? "Your Flat" : pl.name}`; }
+        if (label.trim()) show("hover", hv.point.x, hv.point.y + 0.6, hv.point.z, escapeHtml(label.trim()), "wl-hover");
+      }
+      if (this.target && !hv) show("target", this.target.x, this.interior ? 2.6 : 3.9, this.target.z, `<b>${this.mobile ? "✋" : "E"}</b> ${escapeHtml(this.target.label)}`, "wl-target");
       for (const [k, el] of this.labels) if (!live.has(k)) { el.remove(); this.labels.delete(k); }
     }
 
@@ -933,6 +1319,7 @@
       window.removeEventListener("keyup", this.onKey);
       window.removeEventListener("blur", this.onBlur);
       this.ro.disconnect();
+      this.disposeRoom();
       this.scene.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) { (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => { if (m.map) m.map.dispose(); m.dispose(); }); } });
       this.renderer.dispose();
       this.renderer.domElement.remove();

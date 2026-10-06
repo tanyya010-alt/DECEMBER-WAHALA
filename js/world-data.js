@@ -352,7 +352,7 @@
   };
 
   // Strangers walking around. Their looks are generated from these pools.
-  const STRANGER_NAMES = ["Emeka", "Halima", "Bisi", "Yusuf", "Ngozi", "Femi", "Zainab", "Kunle", "Amaka", "Ibrahim", "Tolu", "Chiamaka", "Segun", "Fatima", "Obinna", "Ronke", "Musa", "Adaeze", "Wale", "Hauwa"];
+  const STRANGER_NAMES = ["Emeka", "Halima", "Bisi", "Yusuf", "Ngozi", "Femi", "Zainab", "Kunle", "Amaka", "Ibrahim", "Tolu", "Chiamaka", "Segun", "Fatima", "Obinna", "Ronke", "Musa", "Adaeze", "Wale", "Hauwa", "Chuka", "Temi", "Dapo", "Ifeoma", "Sani", "Lola", "Uche", "Kemi B.", "Tunji", "Aisha"];
 
   // ------------------------------------------------------------ conversations
   // Questions people ask you. Each answer moves relationship, reputation, money or secrets.

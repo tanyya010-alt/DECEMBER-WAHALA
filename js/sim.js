@@ -10,10 +10,13 @@
   const D = isNode ? require("./data.js") : root.DATA;
   const W = isNode ? require("./world-data.js") : root.WORLD;
   const NAV = isNode ? require("./nav.js") : root.NAV;
+  const SIMS = isNode ? require("./sims-data.js") : root.WORLD.SIMS;
 
   const DAY = W.DAY;
   const SPEEDS = [0, 1, 4, 15]; // game minutes per real second
-  const FAST = 50; // while an activity runs
+  const FAST = 20; // while an activity runs
+  const SLEEP_FAST = 60; // while sleeping
+  const SOCIAL_FAST = 4; // while chatting, so you can watch it happen
   const RIDE_FAST = 35; // while riding across town
   const NPC_SPEED = 1.8; // street units per game minute
   const END = 31 * DAY + 30; // 00:30 on 1 January
@@ -44,6 +47,22 @@
   const fmtMins = (m) => (m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? " " + (m % 60) + "m" : ""}` : `${Math.round(m)} min`);
 
   const STRANGER_STYLES = ["streetwear", "afrochic", "glam", "y2k", "resort", "tradfusion", "oldmoney", "allblack"];
+  const FEMALE = new Set(["Halima", "Bisi", "Ngozi", "Zainab", "Amaka", "Tolu", "Chiamaka", "Fatima", "Ronke", "Adaeze", "Hauwa", "Temi", "Ifeoma", "Lola", "Kemi B.", "Aisha"]);
+  const STRANGERS = 30;
+  const START_SKILLS = { influencer: { photography: 2 }, hustler: { hustle: 3, charisma: 1 }, aunty: { cooking: 3, charisma: 2 }, japa: { hustle: 1 }, ijgb: { charisma: 1 }, wannabe: { charisma: 2 }, firsttimer: { photography: 1 }, pikin: {} };
+  const xpFor = (lvl) => 12 * lvl * lvl;
+  function makeStranger(i, rng) {
+    const name = W.STRANGER_NAMES[i % W.STRANGER_NAMES.length];
+    const body = FEMALE.has(name) ? "woman" : "man";
+    const hairs = Object.keys(D.HAIR[body]);
+    return {
+      id: "s" + i, name,
+      look: { body, skin: Math.floor(rng() * 7), hair: hairs[Math.floor(rng() * hairs.length)], hairColour: rng() < 0.75 ? "black" : "brown",
+        style: STRANGER_STYLES[Math.floor(rng() * STRANGER_STYLES.length)], colour: Math.floor(rng() * 11), fabric: ["plain", "ankara", "adire"][Math.floor(rng() * 3)],
+        shades: rng() < 0.3, gele: false, beard: body === "man" && rng() < 0.4 ? "shaped" : null, build: ["slim", "regular", "curvy"][Math.floor(rng() * 3)] },
+      rel: 20, romance: 0, met: false, memory: [], place: null, move: null,
+    };
+  }
 
   class Sim {
     constructor(state, seed) {
@@ -52,6 +71,22 @@
       this.rng = makeRng(seed);
       this.nav = NAV.get(state.city);
       this.places = this.nav.places;
+      this.bubbles = []; // speech bubbles for the renderer: { who, text, kind }
+      this.migrate();
+    }
+    // Older saves get the life-sim fields.
+    migrate() {
+      const s = this.s;
+      if (!s.npcs) return;
+      const n = s.needs;
+      for (const k of Object.keys(SIMS.NEEDS)) if (!Number.isFinite(n[k])) n[k] = k === "vibes" ? 60 : 75;
+      s.moodlets = s.moodlets || [];
+      if (!s.skills) { s.skills = {}; for (const [k, l] of Object.entries(START_SKILLS[s.persona] || {})) s.skills[k] = xpFor(l); }
+      if (!s.home) s.home = { ...SIMS.START_HOME, ...(s.persona === "pikin" ? { bed: 1, tv: 1, power: 1, cooling: 1 } : s.persona === "ijgb" ? { bed: 1, cooling: 0 } : {}) };
+      s.approach = s.approach || null;
+      const rng = makeRng(s.strangers.length * 977 + 13);
+      while (s.strangers.length < STRANGERS) s.strangers.push(makeStranger(s.strangers.length, rng));
+      s.strangers.forEach((st) => { if (st.romance === undefined) st.romance = 0; });
     }
 
     // ============================================================ creation
@@ -64,24 +99,14 @@
         npcs[n.id] = { rel: n.rel, trust: 50, romance: 0, met: !!n.family, memory: [], secret: 0, state: null, arrived: !n.from, place: null, move: null, favour: false, lastTalk: -1e9 };
       });
       const strangers = [];
-      for (let i = 0; i < 16; i++) {
-        const body = rng() < 0.5 ? "woman" : "man";
-        const hairs = Object.keys(D.HAIR[body]);
-        strangers.push({
-          id: "s" + i, name: W.STRANGER_NAMES[i % W.STRANGER_NAMES.length],
-          look: { body, skin: Math.floor(rng() * 7), hair: hairs[Math.floor(rng() * hairs.length)], hairColour: rng() < 0.75 ? "black" : "brown",
-            style: STRANGER_STYLES[Math.floor(rng() * STRANGER_STYLES.length)], colour: Math.floor(rng() * 11), fabric: ["plain", "ankara", "adire"][Math.floor(rng() * 3)],
-            shades: rng() < 0.3, gele: false, beard: body === "man" && rng() < 0.4 ? "shaped" : null },
-          rel: 20, met: false, memory: [], place: null, move: null,
-        });
-      }
+      for (let i = 0; i < STRANGERS; i++) strangers.push(makeStranger(i, rng));
       const fx = 1550 + D.CITIES[o.city].fxBias;
       const s = {
         version: 3, name: o.name || "Ada", look: { build: "regular", ...o.look }, traits: o.traits, goal: o.goal, persona: o.persona,
         city: o.city, area: o.area,
         t: W.hm("09:00"), speed: 1,
         pos: null, place: "home", inside: true,
-        needs: { energy: 85, belle: 70, vibes: 60 },
+        needs: { energy: 85, belle: 70, vibes: 60, bladder: 80, hygiene: 75, social: 55 },
         naira: P.start.naira, usd: P.start.usd, startFx: fx, fx,
         clout: clamp(P.start.clout + (area.clout || 0), 0, 200), rep: P.start.rep, conn: clamp(P.start.conn + (area.conn || 0)),
         res: P.resource.start || 0, gossip: o.persona === "aunty" ? 2 : 0,
@@ -144,11 +169,72 @@
       if (id === "viral") this.news("viral");
       if (id === "bigbreak") this.news("bigbreak");
     }
-    hasPower() { return this.s.light || this.s.genUntil > this.s.t; }
-    mood() { const n = this.s.needs; return (n.energy + n.belle + n.vibes) / 3; }
-    moodLabel() {
-      const m = this.mood();
-      return m >= 75 ? ["😄", "Very Happy"] : m >= 58 ? ["🙂", "Happy"] : m >= 42 ? ["😐", "Okay"] : m >= 25 ? ["😕", "Stressed"] : ["😫", "Miserable"];
+    hasPower() { const s = this.s; return s.light || s.genUntil > s.t || (s.place === "home" && !!s.home && s.home.power >= 1); }
+    // How well your needs are met (0–100), lowest needs count most.
+    mood() {
+      const n = this.s.needs;
+      const vals = Object.keys(SIMS.NEEDS).map((k) => (Number.isFinite(n[k]) ? n[k] : 60));
+      const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+      return Math.min(avg, Math.min(...vals) + 35);
+    }
+    moodLabel() { const e = this.emotion(); return [e.icon, e.name]; }
+
+    // ============================================================ emotions and moodlets
+    addMoodlet(id, hours) {
+      const def = SIMS.MOODLETS[id];
+      if (!def) return;
+      const s = this.s;
+      const until = s.t + (hours || def.h) * 60;
+      const cur = s.moodlets.find((m) => m.id === id);
+      if (cur) cur.until = Math.max(cur.until, until);
+      else s.moodlets.push({ id, until });
+    }
+    hasMoodlet(id) { return this.s.moodlets.some((m) => m.id === id && m.until > this.s.t); }
+    // Every moodlet affecting you now: timed ones, needs, your surroundings and traits.
+    moodlets() {
+      const s = this.s;
+      const out = s.moodlets.filter((m) => m.until > s.t).map((m) => ({ ...SIMS.MOODLETS[m.id], id: m.id, until: m.until }));
+      out.push(...SIMS.needMoodlets(s, this.hasPower(), s.place === "home" && s.inside));
+      const p = s.place && this.places[s.place];
+      const atm = p && (s.inside || p.kind === "open") && SIMS.ATMOSPHERE[p.type];
+      if (atm && W.isOpen(p.type, s.t) && (!atm.night || this.clock().night)) out.push({ ...atm, id: "atm" });
+      if (this.has("nightcrawler") && this.clock().night) out.push({ id: "nightowl", emotion: "energized", w: 1, label: "Night Owl", icon: "🦉" });
+      if (s.partner && s.npcs[s.partner] && s.npcs[s.partner].romance >= 70) out.push({ id: "inlove", emotion: "flirty", w: 1, label: "In Love", icon: "💘" });
+      if (this.day() >= 24 && this.day() <= 26) out.push({ id: "xmasseason", emotion: "happy", w: 1, label: "Christmas Season", icon: "🎄" });
+      return out;
+    }
+    emotion() {
+      const totals = {};
+      for (const m of this.moodlets()) totals[m.emotion] = (totals[m.emotion] || 0) + m.w;
+      let best = "fine", bw = 0;
+      for (const [e, w] of Object.entries(totals)) if (w > bw) { best = e; bw = w; }
+      if (bw < 1) best = "fine";
+      // A strong "fine" baseline: being well looked after is its own mood.
+      if (best === "uncomfortable" && bw < 2 && this.mood() > 60) best = "fine";
+      return { id: best, w: bw, ...SIMS.EMOTIONS[best], intensity: bw >= 4 ? "Very " : "" };
+    }
+    emoFx() { return SIMS.EMO_FX[this.emotion().id] || {}; }
+
+    // ============================================================ skills
+    skill(k) { return SIMS.skillLevel(this.s.skills[k] || 0); }
+    skillProgress(k) { const xp = this.s.skills[k] || 0, l = this.skill(k); return l >= 10 ? 1 : (xp - xpFor(l)) / (xpFor(l + 1) - xpFor(l)); }
+    gainSkill(k, xp) {
+      if (!k || !SIMS.SKILLS[k] || !(xp > 0)) return;
+      const s = this.s, fx = this.emoFx();
+      let mult = fx.xp || 1;
+      if (fx.xpSkill && fx.xpSkill[k]) mult *= fx.xpSkill[k];
+      if (k === "cooking" && s.home.stove >= 2 && s.place === "home") mult *= 2;
+      if (k === "charisma" && this.has("smooth")) mult *= 1.25;
+      if (k === "hustle" && this.has("hustlebrain")) mult *= 1.25;
+      if (this.has("lazy")) mult *= 0.85;
+      const before = this.skill(k);
+      s.skills[k] = (s.skills[k] || 0) + xp * mult;
+      const after = this.skill(k);
+      if (after > before) {
+        this.log(`⭐ ${SIMS.SKILLS[k].icon} ${SIMS.SKILLS[k].name} skill is now level ${after}!`, "achieve");
+        this.addMoodlet("level_up");
+        if (after >= 5) this.unlock("skilled");
+      }
     }
     relLevel(id) {
       const st = this.whoState(id);
@@ -252,7 +338,7 @@
       const s = this.s;
       if (s.over || s.event || s.convo) return 0;
       if (s.ride) return RIDE_FAST;
-      if (s.activity) return FAST;
+      if (s.activity) return s.activity.id === "sleep" ? SLEEP_FAST : s.activity.id === "social" ? Math.max(SOCIAL_FAST, SPEEDS[s.speed] || 0) : FAST;
       return SPEEDS[s.speed] || 0;
     }
     // Called every frame with real seconds elapsed.
@@ -273,6 +359,7 @@
         if (Math.floor(before / 30) !== Math.floor(s.t / 30)) this.halfHourly();
         if (s.activity && s.t >= s.activity.end) this.finishActivity();
         if (s.ride && s.t >= s.ride.end) this.finishRide();
+        if (s.approach && s.t - s.approach.t >= 12) this.resolveApproach();
         this.updateNpcs();
         this.checkCrisis();
         if (s.t >= END && !s.over) this.finish("missed");
@@ -281,19 +368,31 @@
     }
     passTime(mins) { const sp = this.s.event; this.s.event = null; this.advance(mins); if (!this.s.event) this.s.event = sp; }
 
+    sleepRate() {
+      const s = this.s;
+      const bed = s.place === "home" ? [1, 1.3, 1.5][s.home.bed] || 1 : s.place === "hotel" ? 1.4 : 1;
+      return ((this.hasPower() ? 14 : 9) + (this.has("lazy") ? 3 : 0)) * bed;
+    }
     decay(m) {
-      const s = this.s, h = m / 60;
+      const s = this.s, h = m / 60, N = SIMS.NEEDS, n = s.needs;
       const sleeping = s.activity && s.activity.id === "sleep";
+      const dec = (k, rate) => { n[k] = clamp(n[k] - rate * h); };
       if (sleeping) {
-        const rate = (this.hasPower() ? 14 : 9) + (this.has("lazy") ? 3 : 0);
-        s.needs.energy = clamp(s.needs.energy + rate * h);
-        s.needs.belle = clamp(s.needs.belle - 2 * h);
+        n.energy = clamp(n.energy + this.sleepRate() * h);
+        dec("belle", 2); dec("bladder", 3.5); dec("hygiene", 1.2); dec("social", 0.8);
       } else {
-        s.needs.energy = clamp(s.needs.energy - 4.2 * h);
-        s.needs.belle = clamp(s.needs.belle - 5 * h);
-        s.needs.vibes = clamp(s.needs.vibes - (this.has("owambe") ? 3 : 2) * h);
+        dec("energy", N.energy.decay * (1 - this.skill("fitness") * 0.03));
+        dec("belle", N.belle.decay);
+        dec("bladder", N.bladder.decay * (this.hasMoodlet("partied") || (s.activity && s.activity.pose === "drink") ? 1.4 : 1));
+        dec("hygiene", N.hygiene.decay * (s.activity && ["workout", "dance"].includes(s.activity.pose) ? 3 : 1));
+        dec("vibes", N.vibes.decay * (this.has("owambe") ? 1.3 : 1) * (s.place === "home" && s.home.decor >= 0 ? 0.75 : 1));
+        // Being around people keeps loneliness away.
+        const crowd = s.place && s.inside && s.place !== "home" && this.peopleAt(s.place).length > 0;
+        if (crowd) n.social = clamp(n.social + 1.5 * h);
+        else dec("social", N.social.decay * (this.has("smooth") ? 1.2 : 1));
       }
-      if (!this.hasPower() && s.place === "home" && s.inside) s.needs.vibes = clamp(s.needs.vibes - 1.5 * h);
+      if (!this.hasPower() && s.place === "home" && s.inside) dec("vibes", 1.5);
+      if (s.moodlets.length > 6) s.moodlets = s.moodlets.filter((x) => x.until > s.t);
     }
 
     newDay() {
@@ -333,6 +432,7 @@
       this.checkPlans();
       this.chainTimers();
       if (c.mm === 0 && c.hh >= 9 && c.hh <= 22 && this.rng() < 0.18) this.randomText();
+      this.maybeApproach();
     }
 
     checkCrisis() {
@@ -344,6 +444,13 @@
       } else if (s.needs.energy <= 0 && !(s.activity && s.activity.id === "sleep")) {
         s.needs.energy = 5;
         this.queue({ title: "Body No Be Firewood", icon: "🥱", text: "You're running on nothing. You need to sleep right now.", choices: [{ label: "Sleep it off (6 hours)", special: "forcesleep" }] });
+      } else if (s.needs.bladder <= 0) {
+        s.needs.bladder = 100; s.needs.hygiene = clamp(s.needs.hygiene - 40);
+        this.addMoodlet("accident");
+        const public_ = s.place !== "home" && this.peopleAt(s.place || "busstop").length > 0;
+        if (public_) { this.addStat("rep", -3); this.addStat("clout", -2); }
+        this.bubble("me", "🙈");
+        this.queue({ title: "Wahala! You Couldn't Hold It", icon: "🙈", text: public_ ? "You waited too long for a toilet. People saw. Somebody definitely filmed it." : "You waited too long for a toilet. At least nobody saw.", choices: [{ label: "Pretend it never happened", fx: { vibes: -10 } }] });
       }
     }
 
@@ -371,14 +478,19 @@
       }
       return place;
     }
+    // Strangers go where Lagos goes at that hour: offices by day, clubs by night.
     strangerWanted(i, t) {
       const c = clock(t);
-      if (c.hh < 7 && c.hh >= 2) return null;
-      const ids = Object.keys(this.places).filter((p) => !this.places[p].remote && p !== "home" && p !== "family");
-      const block = Math.floor(c.min / 150);
-      const r = hash(c.day, block, i + 7);
-      if (r < 0.12) return null;
-      return ids[Math.floor(hash(i, c.day, block) * ids.length)];
+      if (c.hh < 6 && c.hh >= 3) return null;
+      const block = Math.floor((c.min + i * 7) / 120);
+      if (hash(c.day, block, i + 7) < 0.14) return null;
+      const w = SIMS.crowdWeights(c, W.eventsOn(c.day));
+      const list = Object.entries(w).filter(([type, n]) => n > 0 && this.places[type] && !this.places[type].remote && (W.TYPES[type].hours === null || W.isOpen(type, t)));
+      if (!list.length) return null;
+      const total = list.reduce((a, [, n]) => a + n, 0);
+      let r = hash(i, c.day, block) * total;
+      for (const [type, n] of list) if ((r -= n) < 0) return type;
+      return list[0][0];
     }
     updateNpcs() {
       const s = this.s;
@@ -502,6 +614,9 @@
       if (a.item && !(s.inventory[a.item] > 0)) return `Need a ${W.ITEMS[a.item].name}`;
       if (a.premium && !["ijgb", "pikin"].includes(s.persona) && s.clout < 100 && !(s.inventory.vip_band > 0)) return "Big money only (or 100 clout)";
       if (a.needsPower && !this.hasPower()) return "No light!";
+      if (a.needsFurniture) { const [k, min] = a.needsFurniture; if ((s.home[k] === undefined ? -1 : s.home[k]) < min) return `Needs: ${SIMS.FURNITURE[k].tiers[min].name} (Buy mode)`; }
+      if (id === "toilet" && s.needs.bladder > 90) return "You don't need to go";
+      if (id === "shower" && s.needs.hygiene > 92) return "You're already fresh";
       const cost = this.actionCost(id, placeId);
       if (cost && !this.canAfford(cost)) return `Need ${naira(cost)}`;
       if (a.fx && a.fx.energy < 0 && s.needs.energy + a.fx.energy < 0) return "Too tired";
@@ -538,14 +653,17 @@
       let mins = a.mins;
       if (id === "sleep") mins = Math.round(clamp((100 - s.needs.energy) / ((this.hasPower() ? 14 : 9) + (this.has("lazy") ? 3 : 0)) * 60, 60, 600));
       if (id === "crossover" || id === "christmas_lunch") mins = a.mins;
+      if ((id === "cook" || id === "snack") && placeId === "home" && s.home.stove >= 1) mins = Math.round(mins * 0.75);
       if (!mins) { this.complete(id, placeId); this.flush(); return true; }
-      s.activity = { id, place: placeId, start: s.t, end: s.t + mins, label: a.name, icon: a.icon };
+      s.activity = { id, place: placeId, start: s.t, end: s.t + mins, label: a.name, icon: a.icon, pose: this.poseFor(id) };
       return true;
     }
+    poseFor(id) { const a = this.actionDef(id) || {}; return SIMS.POSES[id] || a.pose || (a.food ? "eat" : "stand"); }
     cancelActivity() {
       const s = this.s;
       if (!s.activity) return;
       if (s.activity.id === "sleep") { this.finishActivity(); return; }
+      if (s.activity.id === "social") { s.activity = null; return; }
       this.log(`You stopped: ${s.activity.label}.`, "info");
       s.activity = null;
     }
@@ -553,7 +671,8 @@
       const s = this.s;
       const act = s.activity;
       s.activity = null;
-      this.complete(act.id, act.place, act);
+      if (act.id === "social") this.completeSocial(act);
+      else this.complete(act.id, act.place, act);
     }
 
     complete(id, placeId, act) {
@@ -564,7 +683,23 @@
       if (a.big && fx.vibes) fx.vibes = Math.round(fx.vibes * (this.has("bigspender") ? 1.3 : 1) * (this.has("owambe") ? 1.4 : 1));
       if (a.food) { if (fx.belle) fx.belle = Math.round(fx.belle * (this.has("foodie") ? 1.3 : 1)); if (this.has("foodie")) fx.vibes = (fx.vibes || 0) + 6; }
       if (a.special === "church" && this.has("prayer")) { fx.vibes = (fx.vibes || 0) * 2; this.addStat("rep", 2); }
+      // Skills and your home make things better.
+      const atHome = placeId === "home";
+      if ((id === "cook" || id === "snack") && fx.belle) fx.belle = Math.round(fx.belle * (1 + this.skill("cooking") * 0.05) * (atHome ? [1, 1.15, 1.25][s.home.stove] || 1 : 1));
+      if (["party", "dance", "dance_home", "owambe_attend", "beach_party", "concert"].includes(id) && fx.vibes) fx.vibes = Math.round(fx.vibes * (1 + this.skill("dancing") * 0.05));
+      if (atHome && (id === "tv" || id === "dance_home") && fx.vibes) fx.vibes = Math.round(fx.vibes * (id === "tv" && s.home.tv >= 1 ? 2 : 1) * (s.home.decor >= 0 ? 1.2 : 1));
+      if (atHome && id === "host" && s.home.sound >= 1 && fx.vibes) fx.vibes = Math.round(fx.vibes * 1.3);
       if (id !== "sleep") this.applyFx(fx);
+      const mins = act ? act.end - act.start : a.mins || 0;
+      this.gainSkill(SIMS.SKILL_OF[id], mins / 6);
+      if (id === "practice_speech") this.gainSkill("charisma", mins / 4);
+      // Doing things around other people counts as socialising.
+      if (p && !atHome && mins && this.peopleAt(placeId).length) this.applyFx({ social: Math.min(15, Math.round(mins / 6)) });
+      const mood = a.moodlet || SIMS.ACTION_MOODLETS[id];
+      if (id === "cook" && this.skill("cooking") < 2 && this.rng() < 0.25) this.addMoodlet("burnt");
+      else if (id === "cook") this.addMoodlet(this.skill("cooking") >= 3 ? "great_food" : "ate_well");
+      else if (mood) this.addMoodlet(mood);
+      if (["dance", "party"].includes(id) && this.skill("dancing") >= 4) { this.addStat("clout", 2); this.addMoodlet("danced"); }
       this.addStat("clout", a.clout);
       this.addStat("rep", a.rep);
       this.addStat("conn", a.conn);
@@ -588,6 +723,7 @@
     gig(a) {
       const s = this.s;
       let mult = s.persona === "hustler" ? 1 + s.res / 100 : 0.8;
+      mult *= (1 + this.skill("hustle") * 0.04) * (this.emoFx().pay || 1);
       if (this.has("hustlebrain")) mult *= 1.25;
       if (this.has("lazy")) mult *= 0.8;
       const pay = round100(a.gig * mult * (0.85 + this.rng() * 0.3));
@@ -618,14 +754,20 @@
       const pick = (arr) => arr[Math.floor(this.rng() * arr.length)];
       switch (a.special) {
         case "sleep": {
-          const where = placeId === "hotel" ? "in a soft hotel bed" : this.hasPower() ? "with the fan running" : "in the heat (no light)";
+          const home = placeId === "home";
+          const cool = home && this.hasPower() && s.home.cooling >= 0;
+          if (home && this.hasPower() && s.home.cooling >= 1) this.addMoodlet("cool_comfy");
+          else if (!cool && placeId !== "hotel") this.addMoodlet("hot_night");
+          if (s.needs.energy >= 85) this.addMoodlet("slept_well");
+          if ((home && s.home.bed >= 2) || placeId === "hotel") this.addMoodlet("luxury_sleep");
+          const where = placeId === "hotel" ? "in a soft hotel bed" : home && s.home.cooling >= 1 && this.hasPower() ? "with the AC humming" : this.hasPower() ? "with the fan running" : "in the heat (no light)";
           return ` You slept ${where}.`;
         }
         case "cook":
           s.stats.jollof = (s.stats.jollof || 0) + 1;
           if (s.stats.jollof >= 3) this.unlock("jollof");
           return " Party jollof with the perfect bottom-pot. 🔥";
-        case "gen": s.genUntil = s.t + 8 * 60; return " The gen roared to life. Light for 8 hours.";
+        case "gen": { const hrs = s.home.power >= 0 ? 12 : 8; s.genUntil = s.t + hrs * 60; return ` The gen roared to life. Light for ${hrs} hours.`; }
         case "post": return this.post(placeId);
         case "host": {
           s.stats.hosted++;
@@ -837,6 +979,8 @@
       const base = { photo: 140, club: 100, concert: 170, beach: 90, lounge: 90, mall: 50, restaurant: 60, hall: 80, home: 30 }[p.type] || 40;
       const fit = D.STYLES[s.look.style].shines.includes(p.type) ? 1.5 : 1;
       let gain = base * (1 + s.clout / 150) * fit * (s.persona === "influencer" ? 1.4 : 1) * (this.has("clout") ? 1.3 : 1) * (0.7 + this.rng() * 0.6);
+      gain *= (1 + this.skill("photography") * 0.06) * (this.emoFx().posts || 1) * (p.type === "home" && s.home.decor >= 1 ? 2 : 1);
+      this.gainSkill("photography", 2);
       gain = Math.round(gain + this.accessoryClout() * 10);
       this.addStat("followers", gain);
       this.addStat("clout", 2 + Math.round(fit * 1.5));
@@ -1156,6 +1300,196 @@
       };
     }
 
+    // ============================================================ speech bubbles
+    bubble(who, text, kind) { this.bubbles.push({ who, text, kind: kind || "", t: this.s.t }); if (this.bubbles.length > 30) this.bubbles.shift(); }
+
+    // ============================================================ Sims-style social interactions
+    socialOptions(id) {
+      const s = this.s, def = this.who(id), st = this.whoState(id);
+      if (!def || !st) return [];
+      const named = !!this.npcDef(id);
+      const out = [];
+      const invKind = (kind) => Object.keys(s.inventory).find((k) => W.ITEMS[k] && W.ITEMS[k].kind === kind && s.inventory[k] > 0);
+      for (const [sid, so] of Object.entries(SIMS.SOCIALS)) {
+        let why = null;
+        if (so.cat === "secret") {
+          if (!named || !def.secret || st.secret < 100 || st.state) continue;
+          if (sid === "blackmail" && (def.family || id === "seun")) continue;
+          if (sid === "trade" && id === "nkechi") continue;
+        }
+        if (so.romantic && !(named && def.romance && !def.family)) continue;
+        if (so.needsSecret && !(named && def.secret && st.secret < 100)) continue;
+        if (so.persona && !so.persona.includes(s.persona)) continue;
+        if (sid === "explain_japa" && st.japaHelped) continue;
+        if (sid === "ask_favour" && (!named || st.favour || def.vendor)) continue;
+        if (sid === "beg" && !named) continue;
+        if (so.notPartner && s.partner === id) continue;
+        if (so.needsItemKind && !invKind(so.needsItemKind)) why = so.needsItemKind === "gift" ? "Buy a gift first" : "No food on you";
+        if (so.minRel && st.rel < so.minRel) why = why || "You need to be closer first";
+        if (so.minRomance && (st.romance || 0) < so.minRomance) why = why || "Build more romance first";
+        if (so.cost && !this.canAfford(so.cost)) why = why || `Need ${naira(so.cost)}`;
+        out.push({ sid, ...so, why });
+      }
+      // A deeper conversation: they ask you something and your answer matters.
+      out.splice(2, 0, { sid: "ask", cat: "friendly", name: "Deep talk", icon: "🎲", mins: 10, why: null });
+      return out;
+    }
+    socialChance(id, sid) {
+      const s = this.s, so = SIMS.SOCIALS[sid], st = this.whoState(id), fx = this.emoFx();
+      if (!so || so.base === undefined || !st) return 1;
+      let p = so.base + (st.rel - 50) / 250 + this.skill("charisma") * 0.025 + (fx.soc || 0) + ((fx.cats && fx.cats[so.cat]) || 0);
+      if (so.romantic) p += ((st.romance || 0) - 30) / 200 + (this.has("smooth") ? 0.12 : 0);
+      if (so.cat === "friendly" && this.has("smooth")) p += 0.06;
+      if (s.needs.hygiene < 25) p -= 0.15;
+      if (st.mood && st.mood.until > s.t) p -= 0.2;
+      if (this.remembers(id, "exposed") || this.remembers(id, "blackmailed")) p -= 0.3;
+      else if (this.remembers(id, "embarrassed", 2 * DAY) || this.remembers(id, "insulted", 2 * DAY)) p -= 0.1;
+      if (s.partner && s.partner !== id && so.romantic) p -= 0.1;
+      return clamp(p, 0.05, 0.97);
+    }
+    // Starts a social. The world walks you over first; this runs it.
+    startSocial(id, sid) {
+      const s = this.s;
+      if (s.over || s.event || s.activity || s.ride || s.convo) return false;
+      const def = this.who(id), st = this.whoState(id);
+      if (!def || !st) return false;
+      if (this.chainCheck({ talk: id }, true)) { st.met = true; this.flush(); return true; }
+      if (sid === "ask") return this.talk(id);
+      const opt = this.socialOptions(id).find((o) => o.sid === sid);
+      if (!opt || opt.why) { if (opt) this.log(`Can't: ${opt.why}.`, "bad"); return false; }
+      const so = SIMS.SOCIALS[sid];
+      if (so.cost) this.pay(so.cost);
+      const first = !st.met;
+      st.met = true; st.lastTalk = s.t;
+      s.activity = { id: "social", sid, with: id, place: s.place, start: s.t, end: s.t + so.mins, label: `${so.name} · ${def.name}`, icon: so.icon, pose: "talk", first };
+      this.bubble("me", so.bubble || so.icon, "say");
+      return true;
+    }
+    completeSocial(act) {
+      const s = this.s, id = act.with, sid = act.sid, so = SIMS.SOCIALS[sid];
+      const def = this.who(id), st = this.whoState(id);
+      if (!so || !def || !st) return;
+      const name = def.name;
+      const pick = (a) => a[Math.floor(this.rng() * a.length)];
+      this.gainSkill("charisma", so.mins / 4);
+      if (so.secretAction) {
+        const reply = this.secretAction(id, so.secretAction);
+        this.bubble(id, ["expose", "blackmail", "tell"].includes(so.secretAction) ? "😱" : "🥹", "reply");
+        this.log(`${so.icon} ${so.name}: ${reply}`, "event");
+        this.checkAchievements(); this.flush();
+        return;
+      }
+      const ok = this.rng() < this.socialChance(id, sid);
+      const o = (ok ? so.ok : so.fail) || {};
+      let extra = "";
+      if (o.rel) this.rel(id, o.rel);
+      if (o.romance && st.romance !== undefined) st.romance = clamp((st.romance || 0) + o.romance);
+      if (o.social) this.applyFx({ social: o.social });
+      if (o.moodlet) this.addMoodlet(o.moodlet);
+      if (o.them) st.mood = { e: o.them, until: s.t + 180 };
+      ["clout", "rep", "followers", "gossip"].forEach((k) => { if (o[k]) this.addStat(k, o[k]); });
+      if (o.naira) this.earn(o.naira);
+      if (o.dig) extra = this.dig(id, o.dig, null) || "";
+      if (o.rumor) {
+        const cands = W.NPCS.filter((n) => n.id !== id && n.secret && s.npcs[n.id].secret < 100 && s.npcs[n.id].arrived);
+        if (cands.length) extra = this.dig(pick(cands).id, 15, `${name} told you something interesting.`) || extra;
+      }
+      if (o.plan === "date") {
+        const start = this.clock().hh < 19 ? s.t + 120 : this.day() * DAY + W.hm("19:00");
+        s.plans.push({ kind: "date", npc: id, place: "lounge", start, end: start + 240, status: "pending" });
+        extra = `Date at ${this.places.lounge.name}, ${clock(start).weekday} ${clock(start).label}. Don't be late.`;
+      }
+      if (o.partner) {
+        s.partner = id; s.stats.dates++; this.unlock("lover"); this.addMemory(`💞 Started dating ${name}`); this.addMoodlet("official");
+        extra = "It's official! 💞";
+      }
+      if (o.favour) {
+        st.favour = true;
+        const f = FAVOURS[id] || { conn: 8, text: "\"Anything for you. I'll put in a word with my people.\"" };
+        this.applyOutcome(f); extra = f.text;
+      }
+      if (o.japa) { st.japaHelped = true; s.stats.japaHelped++; }
+      if (sid === "give_gift" && ok) { const k = Object.keys(s.inventory).find((x) => W.ITEMS[x] && W.ITEMS[x].kind === "gift" && s.inventory[x] > 0); if (k) { s.inventory[k]--; this.rel(id, Math.round((W.ITEMS[k].rel || 10) / 2)); this.remember(id, "gifted"); } }
+      if (sid === "share_food") { const k = Object.keys(s.inventory).find((x) => W.ITEMS[x] && W.ITEMS[x].kind === "food" && s.inventory[x] > 0); if (k) s.inventory[k]--; }
+      if (sid === "spray") this.remember(id, "gaveMoney");
+      if (so.romantic) this.remember(id, ok ? "flirted" : "embarrassed");
+      if (so.cat === "mean") this.remember(id, "insulted");
+      if (so.romantic && s.partner && s.partner !== id) {
+        const seen = this.peopleAt(s.place || "").includes(s.partner);
+        this.rel(s.partner, seen ? -15 : -6); s.npcs[s.partner].romance = clamp(s.npcs[s.partner].romance - (seen ? 12 : 4));
+        if (seen) { this.addMoodlet("caught"); this.log(`👀 ${this.who(s.partner).name} saw that. Wahala.`, "bad"); this.bubble(s.partner, "😡", "reply"); }
+      }
+      if (act.first && st.rel >= 25) this.addMoodlet("new_friend");
+      const romantic = so.romantic, mean = so.cat === "mean";
+      const okLines = def.lines && def.lines.hi && this.rng() < 0.3 ? def.lines.hi.map((l) => `"${l}"`) : SIMS.REPLIES.ok;
+      const reply = ok ? pick(romantic ? SIMS.REPLIES.romantic_ok : mean ? SIMS.REPLIES.mean_ok : okLines) : pick(romantic ? SIMS.REPLIES.romantic_fail : SIMS.REPLIES.fail);
+      this.bubble(id, ok ? (romantic ? "💕" : mean ? "😠" : so.cat === "funny" ? "😂" : "😊") : (mean ? "😤" : "😒"), "reply");
+      this.log(`${so.icon} ${so.name} → ${name}: ${reply}${extra ? " " + extra : ""}`, ok ? "good" : "bad");
+      s.lastSocial = { id, sid, ok, t: s.t };
+      this.checkAchievements();
+      this.flush();
+    }
+    // Someone nearby comes over to you on their own.
+    maybeApproach() {
+      const s = this.s;
+      if (s.approach || s.over || s.event || s.activity || s.ride || s.convo || !s.place || !s.inside || s.place === "home") return;
+      const here = this.peopleAt(s.place).filter((id) => { const st = this.whoState(id), d = this.npcDef(id); return st && !(d && d.vendor) && (st.met || this.rng() < 0.4); });
+      if (!here.length || this.rng() > 0.4) return;
+      const id = here[Math.floor(this.rng() * here.length)];
+      const st = this.whoState(id), def = this.npcDef(id);
+      const pick = (a) => a[Math.floor(this.rng() * a.length)];
+      let sid = "greet";
+      if (def && def.romance && !def.family && st.romance >= 35) sid = pick(["flirt", "compliment_looks"]);
+      else if (st.met && st.rel < 15) sid = pick(["throw_shade", "insult"]);
+      else if (st.rel >= 60) sid = pick(["joke", "hug", "gist"]);
+      else if (st.met) sid = pick(["gist", "compliment_fit", "joke"]);
+      s.approach = { id, sid, t: s.t };
+    }
+    resolveApproach() {
+      const s = this.s, a = s.approach;
+      if (!a) return;
+      s.approach = null;
+      const so = SIMS.SOCIALS[a.sid], st = this.whoState(a.id), who = this.who(a.id);
+      if (!so || !st || !who) return;
+      const first = !st.met;
+      st.met = true;
+      const mean = so.cat === "mean";
+      if (mean) { this.rel(a.id, -2); this.addMoodlet(a.sid === "insult" ? "insulted" : "shaded"); }
+      else {
+        this.rel(a.id, Math.max(2, Math.round((so.ok.rel || 2) / 2)));
+        this.applyFx({ social: so.ok.social || 6 });
+        if (so.romantic && st.romance !== undefined) { st.romance = clamp(st.romance + 4); this.addMoodlet("flirted"); }
+        else this.addMoodlet({ joke: "laughed", compliment_fit: "complimented", hug: "lonely_hug" }[a.sid] || "approached");
+      }
+      const lines = {
+        greet: first ? `"Hi! I'm ${who.name}. I like your vibe."` : `"Ah, ${s.name}! Long time!"`,
+        gist: "\"Come, let me gist you what happened yesterday…\"", compliment_fit: "\"Your outfit is giving! Where did you get it?\"",
+        joke: "\"Did you hear the one about the IJGB and the danfo?\"", hug: "\"Come here, my person!\" 🤗",
+        flirt: "\"You're looking dangerously good today.\"", compliment_looks: "\"Has anyone told you you're beautiful today?\"",
+        throw_shade: "\"Some people dress like they lost a bet. Not you o… just saying.\"", insult: "\"Ah, it's you. And I was having a good day.\"",
+      };
+      this.bubble(a.id, so.bubble || so.icon, "say");
+      this.log(`${so.icon} ${who.name} came over: ${lines[a.sid] || "\"Hey!\""}`, mean ? "bad" : "good");
+    }
+
+    // ============================================================ buy mode
+    furnitureTier(kind) { const v = this.s.home[kind]; return v === undefined ? -1 : v; }
+    buyFurniture(kind, tier) {
+      const s = this.s, F = SIMS.FURNITURE[kind];
+      if (!F || !F.tiers[tier]) return false;
+      if (!(s.place === "home" && s.inside)) { this.log("Shop for your home from inside your flat.", "bad"); return false; }
+      if (this.furnitureTier(kind) >= tier) return false;
+      const price = F.tiers[tier].price;
+      if (!this.canAfford(price)) { this.log(`You need ${naira(price)} for that.`, "bad"); return false; }
+      this.pay(price);
+      s.home[kind] = tier;
+      this.log(`🛋️ Delivered: ${F.tiers[tier].name} (−${naira(price)}). ${F.tiers[tier].note}`, "good");
+      const upgrades = Object.keys(s.home).filter((k) => s.home[k] > (SIMS.START_HOME[k] === undefined ? -1 : SIMS.START_HOME[k])).length;
+      if (upgrades >= 5) this.unlock("nest");
+      if (kind === "decor" || kind === "sound") this.applyFx({ vibes: 6 });
+      return true;
+    }
+
     // ============================================================ conversations
     // Opens a conversation with a named person or a stranger standing nearby.
     talk(id) {
@@ -1170,7 +1504,10 @@
       const first = !st.met;
       st.met = true;
       const named = !!this.npcDef(id);
-      s.convo = { id, node: "menu", text: this.opener(id, first), named, asked: false };
+      const qs = W.QUESTIONS.filter((q) => !q.persona || q.persona.includes(s.persona));
+      const q = qs[Math.floor(this.rng() * qs.length)];
+      const question = { q: q.q.replace("{club}", this.places.club.name), a: q.a };
+      s.convo = { id, node: "question", question, text: `${this.opener(id, first)} "${question.q}"`, named, asked: true };
       st.lastTalk = s.t;
       return true;
     }
@@ -1199,6 +1536,11 @@
       const c = s.convo;
       if (!c) return [];
       if (c.node === "question") return c.question.a.map((a, i) => ({ id: "answer:" + i, label: a.label, why: a.cost && !this.canAfford(a.cost) ? "Not enough money" : null }));
+      return [{ id: "bye", label: "👋 Nice talking", why: null }];
+    }
+    // Legacy conversation menu (kept for old saves mid-conversation).
+    legacyOptions() {
+      const s = this.s, c = s.convo;
       const id = c.id;
       const def = this.who(id);
       const st = this.whoState(id);
@@ -1302,46 +1644,10 @@
         }
         case "follow": this.addStat("followers", 15); this.rel(id, 6); reply = "\"Followed! Tag me in your pictures.\""; break;
         case "japa": st.japaHelped = true; s.stats.japaHelped++; this.rel(id, 10); this.addStat("rep", 4); mins = 30; reply = "\"Ah! This is gold. Thank you!\""; break;
-        case "keep": {
-          st.state = "protected"; this.rel(id, 15); st.trust = clamp(st.trust + 20); this.remember(id, "protected"); this.unlock("loyal");
-          if (!st.favour && FAVOURS[id]) { st.favour = true; this.applyOutcome(FAVOURS[id]); reply = FAVOURS[id].text; } else reply = "\"Thank you. I won't forget this.\"";
-          this.addMemory(`🤐 Kept ${name}'s secret`);
+        case "keep": case "befriend": case "tell": case "expose": case "blackmail": case "trade":
+          reply = this.secretAction(id, optId);
+          if (optId !== "keep" && optId !== "befriend") c.node = "end";
           break;
-        }
-        case "befriend": st.state = "protected"; this.rel(id, 22); this.addStat("conn", 5); this.remember(id, "helped"); reply = "\"…You know? And you're not going to use it? Okay. You're my person now.\""; this.addMemory(`🤝 Became real friends with ${name}`); break;
-        case "tell": {
-          st.state = "told"; this.addStat("gossip", 1); this.addStat("conn", 3); this.addStat("rep", -2);
-          if (this.rng() < 0.4) s.flags.leak = { id, at: s.t + DAY * (1 + this.rng()) };
-          reply = `You told a few people what ${name} is hiding. It's spreading.`;
-          c.node = "end";
-          break;
-        }
-        case "expose": {
-          st.state = "exposed"; st.rel = 0; this.remember(id, "exposed");
-          this.addStat("clout", 18); this.addStat("followers", 500); this.addStat("rep", this.has("peacemaker") ? -20 : -10); this.addStat("conn", -5);
-          if (def.persona === "wannabe") this.unlock("ijgb_exposed");
-          if (s.persona === "aunty") this.addExposure(15);
-          if (this.rng() < 0.5) s.flags.revenge = { id, at: s.t + DAY * (1 + this.rng()) };
-          this.addMemory(`📣 Exposed ${name}`);
-          reply = `You posted it: "${def.secret}" The blogs picked it up within the hour.`;
-          c.node = "end";
-          break;
-        }
-        case "blackmail": {
-          const amt = BLACKMAIL[id] || 80000;
-          st.state = "blackmailed"; this.earn(amt); this.rel(id, -40); this.remember(id, "blackmailed");
-          if (this.rng() < 0.45) s.flags.bmLeak = { id, at: s.t + DAY * (1 + this.rng() * 2) };
-          reply = `${name} sent ${naira(amt)} with shaking hands. "Happy now?"`;
-          c.node = "end";
-          break;
-        }
-        case "trade": {
-          st.state = "told"; this.addStat("conn", 10); s.inventory.vip_band = (s.inventory.vip_band || 0) + 1;
-          if (this.rng() < 0.3) s.flags.leak = { id, at: s.t + DAY };
-          reply = "Mama Nkechi got the gist. You got a VIP wristband and a lot of new 'friends'.";
-          c.node = "end";
-          break;
-        }
         case "bye":
         default: {
           reply = def.lines ? pick(def.lines.bye) : "\"Later!\"";
@@ -1357,6 +1663,54 @@
       this.passTime(mins);
       this.checkAchievements();
       this.flush();
+    }
+    // What happens when you act on a secret you've uncovered. Returns the line to show.
+    secretAction(id, kind) {
+      const s = this.s;
+      const def = this.who(id);
+      const st = this.whoState(id);
+      const name = def.name;
+      let reply = "";
+      switch (kind) {
+        case "keep": {
+          st.state = "protected"; this.rel(id, 15); st.trust = clamp(st.trust + 20); this.remember(id, "protected"); this.unlock("loyal");
+          if (!st.favour && FAVOURS[id]) { st.favour = true; this.applyOutcome(FAVOURS[id]); reply = FAVOURS[id].text; } else reply = "\"Thank you. I won't forget this.\"";
+          this.addMemory(`🤐 Kept ${name}'s secret`);
+          break;
+        }
+        case "befriend": st.state = "protected"; this.rel(id, 22); this.addStat("conn", 5); this.remember(id, "helped"); reply = "\"…You know? And you're not going to use it? Okay. You're my person now.\""; this.addMemory(`🤝 Became real friends with ${name}`); break;
+        case "tell": {
+          st.state = "told"; this.addStat("gossip", 1); this.addStat("conn", 3); this.addStat("rep", -2);
+          if (this.rng() < 0.4) s.flags.leak = { id, at: s.t + DAY * (1 + this.rng()) };
+          reply = `You told a few people what ${name} is hiding. It's spreading.`;
+          break;
+        }
+        case "expose": {
+          st.state = "exposed"; st.rel = 0; this.remember(id, "exposed");
+          this.addStat("clout", 18); this.addStat("followers", 500); this.addStat("rep", this.has("peacemaker") ? -20 : -10); this.addStat("conn", -5);
+          if (def.persona === "wannabe") this.unlock("ijgb_exposed");
+          if (s.persona === "aunty") this.addExposure(15);
+          if (this.rng() < 0.5) s.flags.revenge = { id, at: s.t + DAY * (1 + this.rng()) };
+          this.addMemory(`📣 Exposed ${name}`);
+          reply = `You posted it: "${def.secret}" The blogs picked it up within the hour.`;
+          break;
+        }
+        case "blackmail": {
+          const amt = BLACKMAIL[id] || 80000;
+          st.state = "blackmailed"; this.earn(amt); this.rel(id, -40); this.remember(id, "blackmailed");
+          if (this.rng() < 0.45) s.flags.bmLeak = { id, at: s.t + DAY * (1 + this.rng() * 2) };
+          reply = `${name} sent ${naira(amt)} with shaking hands. "Happy now?"`;
+          break;
+        }
+        case "trade": {
+          st.state = "told"; this.addStat("conn", 10); s.inventory.vip_band = (s.inventory.vip_band || 0) + 1;
+          if (this.rng() < 0.3) s.flags.leak = { id, at: s.t + DAY };
+          reply = "Mama Nkechi got the gist. You got a VIP wristband and a lot of new 'friends'.";
+          break;
+        }
+        default: break;
+      }
+      return reply;
     }
     // Uncover part of someone's secret.
     dig(id, amt, prefix) {
@@ -1832,7 +2186,7 @@
     const M = W.MISSIONS[s.persona];
     this.queue({
       title: `Welcome to Detty December, ${s.name}!`, icon: "🎄",
-      text: `You're a ${P.name} in ${D.AREAS[s.city][s.area].name}, ${D.CITIES[s.city].name}. Your mission: ${M.icon} ${M.name} — ${M.desc} Your secret: ${P.secret} Walk with WASD or the arrow keys (or the joystick on your phone). Press E or tap ✋ to go inside places and talk to people.`,
+      text: `You're a ${P.name} in ${D.AREAS[s.city][s.area].name}, ${D.CITIES[s.city].name}. Your mission: ${M.icon} ${M.name} — ${M.desc} Your secret: ${P.secret} Click or tap anywhere to walk. Click people, things and buildings to see what you can do — your Sim queues it up and does it, like The Sims. Keep an eye on your needs and your mood.`,
       choices: [{ label: "Let's gooo! 🇳🇬" }],
     });
     this.flush();

@@ -13,7 +13,8 @@ const personas = Object.keys(D.PERSONAS);
 const traitIds = Object.keys(D.TRAITS);
 const goalIds = Object.keys(D.GOALS);
 const results = {};
-const seen = { actions: new Set(), endings: {}, chains: new Set() };
+const seen = { actions: new Set(), endings: {}, chains: new Set(), socials: {}, emotions: new Set(), furniture: 0, approaches: 0, skills: {} };
+const SIMS = require("../js/sims-data.js");
 
 // Every place is reachable from every other place in both cities.
 for (const city of ["lagos", "abuja"]) {
@@ -82,13 +83,28 @@ for (let seed = 1; seed <= RUNS; seed++) {
     if (!s.inside) { g.enter(s.place); continue; }
     if (r <= 12) {
       const here = g.peopleAt(s.place);
-      if (here.length) { g.talk(here[pick(here.length)]); continue; }
+      if (here.length) {
+        const who = here[pick(here.length)];
+        const opts = g.socialOptions(who).filter((o) => !o.why);
+        assert(opts.length, `seed ${seed}: no socials with ${who}`);
+        const o = opts[pick(opts.length)];
+        if (g.startSocial(who, o.sid) && s.activity && s.activity.id === "social") seen.socials[o.sid] = (seen.socials[o.sid] || 0) + 1;
+        continue;
+      }
     }
+    if (r === 13 && s.place === "home") {
+      const kinds = Object.keys(SIMS.FURNITURE);
+      const k = kinds[pick(kinds.length)];
+      if (g.buyFurniture(k, g.furnitureTier(k) + 1)) seen.furniture++;
+    }
+    if (s.approach) seen.approaches++;
+    seen.emotions.add(g.emotion().id);
     const acts = g.actionsAt(s.place).filter((o) => !o.why);
     if (acts.length) { const a = acts[pick(acts.length)]; seen.actions.add(a.id); g.start(a.id); }
     else g.advance(30);
 
-    for (const k in s.needs) assert(Number.isFinite(s.needs[k]), `seed ${seed}: need ${k} = ${s.needs[k]}`);
+    for (const k of Object.keys(SIMS.NEEDS)) assert(Number.isFinite(s.needs[k]), `seed ${seed}: need ${k} = ${s.needs[k]}`);
+    for (const k in s.skills) assert(Number.isFinite(s.skills[k]), `seed ${seed}: skill ${k}`);
     for (const k of ["naira", "usd", "clout", "rep", "conn", "res", "exposure", "followers", "t"]) assert(Number.isFinite(s[k]), `seed ${seed}: ${k} = ${s[k]}`);
     assert(g.peoplePositions().every((p) => Number.isFinite(p.x) && Number.isFinite(p.z)), `seed ${seed}: bad person position`);
     if (steps % 97 === 0) { const st = JSON.parse(JSON.stringify(g.s)); const g2 = new Sim(st, seed); g2.rng = g.rng; Object.assign(g, { s: g2.s }); } // save/load round-trip
@@ -97,6 +113,7 @@ for (let seed = 1; seed <= RUNS; seed++) {
   assert(e && Number.isFinite(e.score) && e.bio, `seed ${seed}: bad ending`);
   assert(g.s.t <= END + 60, `seed ${seed}: clock ran past the end`);
   seen.endings[e.kind] = (seen.endings[e.kind] || 0) + 1;
+  for (const k of Object.keys(SIMS.SKILLS)) seen.skills[k] = Math.max(seen.skills[k] || 0, g.skill(k));
   const r = (results[persona] = results[persona] || { runs: 0, score: 0, exposed: 0, mission: 0 });
   r.runs++; r.score += e.score; if (g.s.exposed) r.exposed++; if (e.missionMet) r.mission++;
 }
@@ -105,3 +122,15 @@ console.log(`${RUNS} simulated Decembers completed (real-time engine).`);
 for (const [p, r] of Object.entries(results)) console.log(`  ${p.padEnd(11)} avg score ${Math.round(r.score / r.runs)}  exposed ${r.exposed}/${r.runs}  mission ${r.mission}/${r.runs}`);
 console.log("  endings:", JSON.stringify(seen.endings));
 console.log(`  distinct actions used: ${seen.actions.size} · story chains reached: ${[...seen.chains].join(", ") || "none"}`);
+console.log(`  socials: ${Object.keys(seen.socials).length} kinds, ${Object.values(seen.socials).reduce((a, b) => a + b, 0)} total · approaches seen: ${seen.approaches} · furniture bought: ${seen.furniture}`);
+console.log(`  emotions felt: ${[...seen.emotions].join(", ")}`);
+console.log(`  best skill levels: ${JSON.stringify(seen.skills)}`);
+// Old (v3, pre-life-sim) saves load and gain the new fields.
+{
+  const g = Sim.create({ name: "Old", look: { body: "woman", skin: 2, hair: "knotless", hairColour: "black", style: "glam", colour: 1, fabric: "plain" }, traits: ["foodie", "smooth"], goal: "legend", persona: "ijgb", city: "lagos", area: "lekki" }, 5);
+  const st = JSON.parse(JSON.stringify(g.s));
+  delete st.skills; delete st.home; delete st.moodlets; delete st.approach; st.strangers.length = 16; st.needs = { energy: 50, belle: 50, vibes: 50 };
+  const g2 = new Sim(st, 5);
+  assert(g2.s.strangers.length === 30 && g2.s.home && g2.s.skills && Number.isFinite(g2.s.needs.bladder) && g2.emotion().id, "migration failed");
+  console.log("  old save migration: ok");
+}

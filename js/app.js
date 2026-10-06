@@ -3,6 +3,8 @@
 /* global DATA, WORLD, SIM, NAV, Avatar, Avatar3D, World3D */
 (function () {
   const D = window.DATA, W = window.WORLD, S = window.SIM;
+  const SIMS = W.SIMS;
+  const NEEDS = SIMS.NEEDS;
   const $ = (id) => document.getElementById(id);
   const esc = (t) => String(t == null ? "" : t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const naira = S.naira;
@@ -28,7 +30,7 @@
   const app = {
     online: false, user: null, sim: null, world: null,
     city: { people: [], feed: [], online: 0, players: 0 },
-    landingCity: "lagos", panel: null, phoneApp: null, mapSel: null, playerTalk: null,
+    landingCity: "lagos", panel: null, phoneApp: null, mapSel: null, playerTalk: null, pie: null, queue: [], qCur: null, rideWas: false,
     step: 0, draft: null, stage: null, raf: 0, last: 0, hudT: 0, saveT: 0, pollT: 0, busy: false, lastTop: null,
   };
 
@@ -315,12 +317,14 @@
     show(state.over ? "screen-end" : "screen-game");
     app.sim = new S.Sim(state);
     if (state.over) { renderEnd(); return; }
-    app.panel = null; app.phoneApp = null; app.playerTalk = null; app.lastTop = null;
+    app.panel = null; app.phoneApp = null; app.playerTalk = null; app.lastTop = null; app.queue = []; app.qCur = null; app.pie = null;
     if (app.world) app.world.dispose();
     app.world = new World3D($("world"), app.sim, {
       onInteractKey: interact,
-      onArrive: (id) => { const p = app.sim.places[id]; toast(`📍 ${p.name}. ${matchMedia("(pointer: coarse)").matches ? "Tap ✋" : "Press E"} to ${p.kind === "building" ? "go inside" : "look around"}.`); },
-      onRoom: () => renderHud(true),
+      onPick,
+      onCancel: () => { clearQueue(); renderHud(true); },
+      onArrive: (id) => { const p = app.sim.places[id]; if (p.kind === "building") enterPlace(id); else toast(`📍 ${p.name}. Click it for things to do.`); },
+      onRoom: () => { closePie(); renderHud(true); },
       remotePlayers: () => (app.online && app.user ? app.city.people.filter((p) => p.place) : []),
     });
     const coarse = matchMedia("(pointer: coarse)").matches;
@@ -345,6 +349,10 @@
     const paused = app.playerTalk || !$("m-menu").hidden || !$("m-help").hidden || !$("m-confirm").hidden;
     if (!paused) sim.tick(dt);
     app.world.update(dt, dt);
+    // Arriving by ride takes you straight inside.
+    if (app.rideWas && !sim.s.ride && sim.s.place) { const p = sim.places[sim.s.place]; if (p && p.kind === "building") enterPlace(sim.s.place, true); }
+    app.rideWas = !!sim.s.ride;
+    runQueue();
     app.hudT += dt; app.saveT += dt; app.pollT += dt;
     if (app.hudT > 0.2) { app.hudT = 0; renderHud(); }
     if (app.saveT > 15) { app.saveT = 0; persist(); }
@@ -370,36 +378,241 @@
   }
   function sessionLost() { toast("You've been logged out. Log in again to keep playing."); app.user = null; showLanding(); }
 
-  // ------------------------------------------------------------------ interaction
+  // ------------------------------------------------------------------ interaction queue
+  // Like The Sims: what you pick goes in a queue; your Sim walks over and does
+  // each thing in turn. Tapping a queued item cancels it.
+  function enqueue(item) {
+    if (app.queue.length >= 6) { toast("Your queue is full. Let your Sim finish first."); return; }
+    app.queue.push(item);
+    runQueue();
+    renderQueue();
+  }
+  function clearQueue() { app.queue = []; app.qCur = null; }
+  function runQueue() {
+    const sim = app.sim, w = app.world;
+    if (!sim || !w) return;
+    const s = sim.s;
+    if (app.qCur || !app.queue.length || s.activity || s.event || s.convo || s.ride || s.over || app.playerTalk) return;
+    const it = app.queue.shift();
+    app.qCur = it;
+    const done = () => { if (app.qCur === it) app.qCur = null; renderHud(true); };
+    try {
+      it.go(done);
+      if (w.walk) w.walk.onCancel = done;
+    } catch (e) { console.error(e); done(); }
+    renderQueue();
+  }
+  function lastLog() { return app.sim.s.log[0] ? app.sim.s.log[0].text : "Not right now."; }
+  function startAction(id) {
+    const sim = app.sim;
+    if (id === "wardrobe") { openPanel("bag"); return; }
+    if (id === "exit") { app.world.exitRoom(); return; }
+    if (id === "buymode") { openPanel("buy"); return; }
+    const before = sim.s.log[0];
+    if (!sim.start(id) && sim.s.log[0] !== before) toast(lastLog(), "bad");
+  }
+  // Use something: walk to the object that offers it, then do it.
+  function queueAction(id, obj) {
+    const sim = app.sim, w = app.world, a = sim.actionDef(id) || { name: id === "exit" ? "Leave" : id === "wardrobe" ? "Change outfit" : id, icon: id === "exit" ? "🚪" : "👗" };
+    const s = sim.s;
+    if (w.interior && w.room && !obj) obj = w.room.objects.find((o) => o.act.includes(id));
+    const label = a.name;
+    if (obj) { enqueue({ icon: a.icon, label, go: (done) => w.walkToObject(obj, () => { startAction(id); done(); }) }); return; }
+    const pl = s.place && sim.places[s.place];
+    if (pl && pl.kind === "open" && !w.interior) {
+      enqueue({ icon: a.icon, label, go: (done) => {
+        const p = w.player.position;
+        const go = () => { if (!(s.place === pl.id && s.inside)) sim.enter(pl.id); startAction(id); done(); };
+        if (Math.hypot(p.x - pl.spot.x, p.z - pl.spot.z) > 6) w.goTo(pl.spot.x, pl.spot.z, go, { run: true }); else go();
+      } });
+      return;
+    }
+    enqueue({ icon: a.icon, label, go: (done) => { startAction(id); done(); } });
+  }
+  function queueSocial(pid, sid) {
+    const sim = app.sim, w = app.world;
+    const so = sid === "ask" ? { name: "Deep talk", icon: "🎲" } : SIMS.SOCIALS[sid];
+    const who = sim.who(pid);
+    enqueue({ icon: so.icon, label: `${so.name} · ${who ? who.name : ""}`, go: (done) => w.walkToPerson(pid, (ok) => {
+      if (!ok) { toast(`${who ? who.name : "They"} moved away.`); done(); return; }
+      const before = sim.s.log[0];
+      if (!sim.startSocial(pid, sid) && sim.s.log[0] !== before) toast(lastLog(), "bad");
+      done();
+    }) });
+  }
+  function queueVisit(id) {
+    const p = app.sim.places[id];
+    enqueue({ icon: p.icon, label: p.kind === "building" ? `Go into ${p.id === "home" ? "your flat" : p.name}` : `Go to ${p.name}`, go: (done) => app.world.walkTo(id, () => { if (p.kind === "building") enterPlace(id); else { app.sim.enter(id); toast(`${p.icon} ${p.name}. Click it for things to do.`); } done(); }) });
+  }
+  function enterPlace(id, quiet) {
+    const sim = app.sim;
+    if (!sim.enter(id)) { renderHud(true); toast(lastLog(), "bad"); return false; }
+    const p = sim.places[id];
+    if (p.kind === "building") {
+      app.world.enterRoom(id);
+      if (!quiet) toast(id === "home" ? "🏠 Home sweet home. Click your bed, kitchen, TV, mirror or desk. Use 🛋️ Buy to upgrade." : `${p.icon} ${p.name}. Click people and things to interact.`);
+    }
+    renderHud(true);
+    return true;
+  }
+  // E key and the ✋ button open the menu for whatever is closest.
   function interact() {
     const sim = app.sim, world = app.world;
     if (!sim || !world || sim.s.event || sim.s.convo || app.playerTalk) return;
+    if (app.pie) { closePie(); return; }
     const t = world.target;
     if (!t) return;
-    if (t.kind === "person") { sim.talk(t.id); renderHud(true); return; }
-    if (t.kind === "player") { openPlayer(t.id); return; }
-    if (t.kind === "object") { objectAction(t.id); return; }
-    if (t.kind === "place") enterPlace(t.id);
+    const sp = world.screenOf(t.x, 2.2, t.z);
+    const pick = t.kind === "object" ? { kind: "object", obj: t.obj } : t.kind === "player" ? { kind: "player", id: t.id } : { kind: t.kind, id: t.id };
+    openPie(pick, sp.x, sp.y);
   }
-  function enterPlace(id) {
-    const sim = app.sim;
-    if (!sim.enter(id)) { renderHud(true); toast(sim.s.log[0] ? sim.s.log[0].text : "You can't go in right now."); return; }
-    if (id === "home") { app.world.enterHome(); closeSheet(); toast("🏠 Home sweet home. Walk up to the bed, stove, TV, desk or mirror."); }
-    else openPanel("place");
-    renderHud(true);
+  function onPick(pick, x, y) {
+    const sim = app.sim, w = app.world, s = sim.s;
+    if (s.event || s.convo || app.playerTalk || s.over) return;
+    if (app.pie) { closePie(); return; }
+    if (pick.kind === "ground") {
+      if (s.ride) return;
+      if (s.activity && s.activity.id === "sleep") { toast("😴 You're asleep. Tap Stop to wake up."); return; }
+      clearQueue();
+      if (s.activity) sim.cancelActivity();
+      w.goTo(pick.x, pick.z, null);
+      renderHud(true);
+      return;
+    }
+    openPie(pick, x, y);
   }
-  function objectAction(a) {
-    const sim = app.sim;
-    if (a === "exit") { app.world.exitHome(); closeSheet(); renderHud(true); return; }
-    if (a === "wardrobe") { openPanel("bag"); return; }
-    if (sim.start(a)) toast(`${W.ACTIONS[a].icon} ${W.ACTIONS[a].name}…`);
-    else toast(sim.s.log[0] ? sim.s.log[0].text : "Not right now.");
+
+  // ------------------------------------------------------------------ pie menus
+  function objectActions(obj) {
+    const sim = app.sim, s = sim.s, placeId = s.place;
+    const here = placeId ? sim.actionsAt(placeId).map((x) => x.id) : [];
+    return obj.act.filter((id) => {
+      if (["exit", "wardrobe"].includes(id)) return true;
+      if (["christmas_lunch", "confess", "crossover"].includes(id)) return here.includes(id);
+      return !!sim.actionDef(id);
+    }).map((id) => {
+      if (id === "exit") return { id, icon: "🚪", label: "Leave", why: null };
+      if (id === "wardrobe") return { id, icon: "👗", label: "Change outfit", why: null };
+      const a = sim.actionDef(id);
+      let why = placeId ? sim.blocked(id, placeId) : "Go inside first";
+      if (id === "sleep" && placeId === "hotel" && s.flags.hotelNight !== sim.day()) why = "Book a night at reception";
+      if (why === "You're busy") why = null; // it will wait in the queue
+      const cost = placeId ? sim.actionCost(id, placeId) : 0;
+      const bits = [];
+      if (cost) bits.push(naira(cost));
+      if (a.gig) bits.push(`earn ~${naira(a.gig)}`);
+      if (id === "sleep") bits.push("until rested"); else if (a.mins) bits.push(S.fmtMins(a.mins));
+      return { id, icon: a.icon, label: a.name, why, note: bits.join(" · ") };
+    });
+  }
+  function openPie(pick, x, y) {
+    const sim = app.sim, s = sim.s, w = app.world;
+    let title = "", sub = "", head = "", items = [];
+    if (pick.kind === "person") {
+      const who = sim.who(pick.id), st = sim.whoState(pick.id);
+      if (!who || !st) return;
+      title = who.name;
+      const romanceable = !!(sim.npcDef(pick.id) && who.romance && !who.family);
+      sub = `${who.role ? who.role + " · " : ""}${sim.relLevel(pick.id)}${st.mood && st.mood.until > s.t ? " · 😠 upset" : ""}`;
+      head = `<div class="pie-bars"><span>❤️</span><i class="bar"><b style="width:${Math.round(st.rel)}%"></b></i>${romanceable ? `<span>💞</span><i class="bar pink"><b style="width:${Math.round(st.romance || 0)}%"></b></i>` : ""}</div>`;
+      const opts = sim.socialOptions(pick.id);
+      const cats = [...new Set(opts.map((o) => o.cat))];
+      items = cats.map((c) => ({ icon: SIMS.SOCIAL_CATS[c].icon, label: SIMS.SOCIAL_CATS[c].name, cat: c, sub: opts.filter((o) => o.cat === c).map((o) => ({ icon: o.icon, label: o.name, why: o.why, run: () => queueSocial(pick.id, o.sid) })) }));
+      const face = memo("bust", who.look);
+      head = `<div class="pie-face">${face}</div>` + head;
+    } else if (pick.kind === "player") {
+      title = "@" + pick.id; sub = "Real player";
+      items = [{ icon: "💬", label: "Talk", run: () => enqueue({ icon: "💬", label: `Talk to @${pick.id}`, go: (done) => w.walkToPerson("p:" + pick.id, () => { openPlayer(pick.id); done(); }) }) }];
+    } else if (pick.kind === "object") {
+      const o = pick.obj;
+      title = `${o.icon || ""} ${o.label || ""}`.trim();
+      if (o.furniture && sim.s.place === "home") { const t = sim.furnitureTier(o.furniture); sub = t >= 0 ? SIMS.FURNITURE[o.furniture].tiers[t].name : ""; }
+      items = objectActions(o).map((a) => ({ icon: a.icon, label: a.label, why: a.why, note: a.note, run: () => queueAction(a.id, o) }));
+      if (o.furniture && sim.s.place === "home") items.push({ icon: "🛋️", label: "Upgrade (Buy mode)", run: () => openPanel("buy") });
+    } else if (pick.kind === "place") {
+      const p = sim.places[pick.id];
+      if (!p) return;
+      const T = W.TYPES[p.type];
+      const open = W.isOpen(p.type, s.t) || T.hours === null;
+      title = `${p.icon} ${p.id === "home" ? "Your Flat" : p.name}`;
+      sub = T.hours ? `${open ? "🟢 Open" : "🔴 Closed"} · ${S.clock(T.hours[0]).label}–${S.clock(T.hours[1] % 1440).label}` : "Open 24 hours";
+      if (p.kind === "building") {
+        items.push({ icon: p.id === "home" ? "🏠" : "🚪", label: p.id === "home" ? "Go home" : "Go inside", run: () => queueVisit(p.id) });
+      } else {
+        const outdoor = (SIMS.OUTDOOR[p.type] || []).flatMap((o) => o.act);
+        const here = sim.actionsAt(p.id).map((x) => x.id);
+        [...new Set([...outdoor.filter((id) => id !== "crossover" || here.includes("crossover"))])].forEach((id) => {
+          const a = sim.actionDef(id);
+          if (!a) return;
+          let why = sim.blocked(id, p.id);
+          if (why === "You're busy") why = null;
+          const cost = sim.actionCost(id, p.id);
+          items.push({ icon: a.icon, label: a.name, why, note: [cost ? naira(cost) : "", a.gig ? `earn ~${naira(a.gig)}` : "", a.mins ? S.fmtMins(a.mins) : ""].filter(Boolean).join(" · "), run: () => {
+            enqueue({ icon: a.icon, label: a.name, go: (done) => w.walkTo(p.id, () => { if (!(s.place === p.id && s.inside)) sim.enter(p.id); startAction(id); done(); }) });
+          } });
+        });
+      }
+      items.push({ icon: "🚶🏾", label: "Walk here", run: () => { clearQueue(); w.walkTo(p.id, () => { if (p.kind !== "building") sim.enter(p.id); }); } });
+    } else if (pick.kind === "self") {
+      title = s.name; const e = sim.emotion(); sub = `${e.icon} ${e.intensity}${e.name}`;
+      const canChange = s.place === "home" || ["hotel", "fashion", "mall", "family"].includes(sim.places[s.place] && sim.places[s.place].type);
+      items.push({ icon: "📸", label: "Take a selfie and post", why: s.activity || s.ride ? "Busy" : null, run: () => { sim.log("📸" + sim.post(s.place || "home"), "good"); renderHud(true); } });
+      items.push({ icon: "📱", label: "Check phone", run: () => openPanel("phone") });
+      items.push({ icon: "👗", label: "Change outfit", why: canChange ? null : "At home, a hotel or a store", run: () => openPanel("bag") });
+      const P = sim.P, ab = sim.abilityBlocked();
+      items.push({ icon: P.ability.icon, label: P.ability.name, why: ab, run: () => { sim.useAbility(); renderHud(true); } });
+      Object.entries(s.inventory).filter(([k, n]) => n > 0 && W.ITEMS[k] && W.ITEMS[k].kind === "food").slice(0, 2).forEach(([k]) => items.push({ icon: W.ITEMS[k].icon, label: `Eat ${W.ITEMS[k].name.toLowerCase()}`, run: () => { sim.equipItem(k); renderHud(true); } }));
+      items.push({ icon: "👤", label: "My Sim", run: () => openPanel("me") });
+      if (s.place === "home" && s.inside) items.push({ icon: "🛋️", label: "Buy mode", run: () => openPanel("buy") });
+    }
+    if (!items.length) return;
+    app.pie = { pick, x, y, title, sub, head, items, cat: null };
+    renderPie();
+  }
+  function closePie() { app.pie = null; const el = $("pie"); el.hidden = true; el.innerHTML = ""; }
+  function renderPie() {
+    const pie = app.pie, el = $("pie");
+    if (!pie) { closePie(); return; }
+    const list = pie.cat ? pie.items.find((i) => i.cat === pie.cat).sub : pie.items;
+    const n = list.length + (pie.cat ? 1 : 0);
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const narrow = vw < 560;
+    const r = narrow ? Math.min(118, 82 + n * 5) : Math.min(170, 100 + n * 8);
+    const cx = Math.max(r + (narrow ? 70 : 100), Math.min(vw - r - (narrow ? 70 : 100), pie.x));
+    const cy = Math.max(r + (narrow ? 70 : 105), Math.min(vh - r - (narrow ? 90 : 70), pie.y));
+    let html = `<div class="pie-back" data-pie="close"></div><div class="pie-wheel" style="left:${cx}px;top:${cy}px">`;
+    html += `<div class="pie-center">${pie.cat ? "" : pie.head || ""}<b>${esc(pie.cat ? SIMS.SOCIAL_CATS[pie.cat].icon + " " + SIMS.SOCIAL_CATS[pie.cat].name : pie.title)}</b>${pie.sub && !pie.cat ? `<small>${esc(pie.sub)}</small>` : ""}</div>`;
+    const all = pie.cat ? [{ icon: "‹", label: "Back", back: true }, ...list] : list;
+    all.forEach((it, i) => {
+      const ang = -Math.PI / 2 + (i / all.length) * Math.PI * 2;
+      const x = Math.cos(ang) * r, y = Math.sin(ang) * r * (narrow ? 1.12 : 0.92);
+      html += `<button class="pie-item${it.back ? " back" : ""}${it.cat ? " cat" : ""}" data-pi="${i}" ${it.why ? `aria-disabled="true" title="${esc(it.why)}"` : ""} style="transform:translate(calc(${x.toFixed(1)}px - 50%), calc(${y.toFixed(1)}px - 50%))"><span class="pie-ic">${it.icon}</span><span class="pie-l">${esc(it.label)}${it.why ? `<small class="why">${esc(it.why)}</small>` : it.note ? `<small>${esc(it.note)}</small>` : ""}</span></button>`;
+    });
+    html += `</div>`;
+    el.innerHTML = html;
+    el.hidden = false;
+    el.dataset.n = all.length;
+  }
+  function pieClick(e) {
+    const pie = app.pie;
+    if (!pie) return;
+    const b = e.target.closest("[data-pi], [data-pie]");
+    if (!b) return;
+    if (b.dataset.pie === "close") { closePie(); return; }
+    const list = pie.cat ? [{ back: true }, ...pie.items.find((i) => i.cat === pie.cat).sub] : pie.items;
+    const it = list[Number(b.dataset.pi)];
+    if (!it) return;
+    if (it.back) { pie.cat = null; renderPie(); return; }
+    if (it.cat) { pie.cat = it.cat; renderPie(); return; }
+    if (it.why) { toast(it.why, "bad"); return; }
+    closePie();
+    it.run();
     renderHud(true);
   }
 
   // ------------------------------------------------------------------ HUD
   function needBar(k, v) {
-    const n = D.NEEDS[k];
+    const n = NEEDS[k];
     const cls = v >= 55 ? "" : v >= 30 ? "mid" : "lo";
     return `<div class="need" title="${n.label} ${Math.round(v)}"><span>${n.icon}</span><div class="bar ${cls}"><i style="width:${Math.round(v)}%"></i></div></div>`;
   }
@@ -407,7 +620,7 @@
     const bits = [];
     if (o.cost) bits.push(`−${naira(o.cost)}`);
     if (o.usd) bits.push(`−$${o.usd}`);
-    if (o.fx) bits.push(Object.entries(o.fx).map(([k, v]) => `${D.NEEDS[k].icon}${v > 0 ? "+" : ""}${v}`).join(" "));
+    if (o.fx) bits.push(Object.entries(o.fx).map(([k, v]) => `${(NEEDS[k] || D.NEEDS[k]).icon}${v > 0 ? "+" : ""}${v}`).join(" "));
     [["clout", "📱"], ["rep", "🤝🏾"], ["conn", "🔗"], ["followers", "👥"]].forEach(([k, i]) => { if (o[k]) bits.push(`${i}${o[k] > 0 ? "+" : ""}${o[k]}`); });
     if (o.mins) bits.push(`⏱ ${S.fmtMins(o.mins)}`);
     if (o.note) bits.push(o.note);
@@ -420,9 +633,12 @@
     $("h-sun").textContent = c.night ? "🌙" : c.hh < 8 ? "🌅" : "☀️";
     $("h-time").textContent = `${c.weekday.slice(0, 3)} ${c.day} Dec · ${c.label}`;
     document.querySelectorAll("#h-speed button").forEach((b) => b.classList.toggle("sel", Number(b.dataset.speed) === s.speed && !s.activity && !s.ride));
-    const [mi, ml] = sim.moodLabel();
-    $("h-mood").innerHTML = `${mi} <b>${ml}</b>`;
-    $("h-mood").className = "hud-mood " + (sim.mood() >= 55 ? "good" : sim.mood() >= 30 ? "mid" : "bad");
+    const emo = sim.emotion();
+    $("h-mood").innerHTML = `${emo.icon} <b>${emo.intensity}${emo.name}</b>`;
+    $("h-mood").className = "hud-mood";
+    $("h-mood").style.color = emo.color;
+    $("h-emo").textContent = emo.icon;
+    $("h-emo").style.background = emo.color;
     $("h-live").hidden = !(app.online && app.user);
     $("h-online").textContent = app.city.online.toLocaleString();
     $("h-naira").textContent = naira(s.naira);
@@ -433,9 +649,16 @@
     if ($("h-quests").dataset.html !== qhtml) { $("h-quests").innerHTML = qhtml; $("h-quests").dataset.html = qhtml; }
     // Me corner.
     const faceKey = JSON.stringify(s.look);
-    if ($("h-face").dataset.k !== faceKey) { $("h-face").innerHTML = memo("bust", s.look); $("h-face").dataset.k = faceKey; }
+    if ($("h-face").dataset.k !== faceKey) { $("h-face-svg").innerHTML = memo("bust", s.look); $("h-face").dataset.k = faceKey; }
     $("h-face").style.setProperty("--ring", sim.mood() >= 55 ? "var(--mint)" : sim.mood() >= 30 ? "var(--gold)" : "var(--coral)");
-    $("h-needs").innerHTML = Object.keys(D.NEEDS).map((k) => needBar(k, s.needs[k])).join("") + `<div class="mini-stats"><span title="Clout">📱 ${Math.round(s.clout)}</span><span title="Reputation">🤝🏾 ${Math.round(s.rep)}</span><span title="Connections">🔗 ${Math.round(s.conn)}</span><span title="Followers">👥 ${compact(s.followers)}</span></div>`;
+    const nh = Object.keys(NEEDS).map((k) => needBar(k, s.needs[k])).join("");
+    if ($("h-needs").dataset.html !== nh) { $("h-needs").innerHTML = nh; $("h-needs").dataset.html = nh; }
+    const mls = sim.moodlets().sort((a, b) => b.w - a.w).slice(0, 7);
+    const mh = mls.map((m) => `<span class="ml" style="--c:${SIMS.EMOTIONS[m.emotion].color}" title="${esc(m.label)} · ${esc(SIMS.EMOTIONS[m.emotion].name)} +${m.w}${m.until ? ` · ${S.fmtMins(Math.max(1, Math.round(m.until - s.t)))} left` : ""}">${m.icon}</span>`).join("") + `<span class="mini-stats"><span title="Clout">📱 ${Math.round(s.clout)}</span><span title="Reputation">🤝🏾 ${Math.round(s.rep)}</span><span title="Connections">🔗 ${Math.round(s.conn)}</span><span title="Followers">👥 ${compact(s.followers)}</span></span>`;
+    if ($("h-moodlets").dataset.html !== mh) { $("h-moodlets").innerHTML = mh; $("h-moodlets").dataset.html = mh; }
+    const pl = s.place && sim.places[s.place];
+    $("h-here").hidden = !(pl && (s.inside || pl.kind === "open") && !s.ride);
+    $("h-buy").hidden = !(s.place === "home" && s.inside);
     const P = sim.P, why = sim.abilityBlocked();
     $("h-ability").textContent = `${P.ability.icon} ${P.ability.name}`;
     $("h-ability").disabled = !!why;
@@ -449,7 +672,7 @@
     [$("h-unread"), $("h-unread2")].forEach((b) => { b.hidden = !unread; b.textContent = unread > 9 ? "9+" : unread; });
     // Activity or ride progress.
     const a = s.activity || s.ride;
-    $("h-activity").hidden = !a;
+    $("h-activity").hidden = !a || (!!app.panel && window.innerWidth < 640);
     if (a) {
       const total = a.end - a.start, done = Math.max(0, s.t - a.start);
       $("act-icon").textContent = a.icon;
@@ -461,11 +684,29 @@
     // Interact button.
     const t = app.world && app.world.target;
     $("h-interact").hidden = !t || !$("hud").classList.contains("touch");
+    renderQueue();
     // Announce new log lines.
     announce();
     renderEvent();
     renderDialog();
-    if (force || app.panel === "place" || app.panel === "me") refreshPanel();
+    if (force || app.panel === "place" || app.panel === "me" || app.panel === "buy") refreshPanel();
+  }
+  // The action queue, top to bottom: what you're doing, walking to, then next.
+  function renderQueue() {
+    const sim = app.sim;
+    if (!sim || app.pressing) return;
+    const s = sim.s;
+    const parts = [];
+    if (s.activity) {
+      const pct = Math.min(100, Math.max(0, ((s.t - s.activity.start) / Math.max(1, s.activity.end - s.activity.start)) * 100));
+      parts.push(`<button class="qi now" data-q="act" title="${esc(s.activity.label)} · tap to stop" style="--p:${pct.toFixed(0)}%"><span>${s.activity.icon}</span></button>`);
+    }
+    if (app.qCur) parts.push(`<button class="qi walk" data-q="cur" title="${esc(app.qCur.label)} · tap to cancel"><span>${app.qCur.icon}</span><i>🚶🏾</i></button>`);
+    app.queue.forEach((it, i) => parts.push(`<button class="qi" data-q="${i}" title="${esc(it.label)} · tap to cancel"><span>${it.icon}</span></button>`));
+    const html = parts.join("");
+    const el = $("h-queue");
+    el.hidden = !html;
+    if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; }
   }
   function compact(n) { return n >= 1e6 ? (n / 1e6).toFixed(1) + "m" : n >= 1e4 ? Math.round(n / 1e3) + "k" : n >= 1e3 ? (n / 1e3).toFixed(1) + "k" : String(Math.round(n)); }
   function announce() {
@@ -559,11 +800,8 @@
   }
 
   // ------------------------------------------------------------------ panels
-  function openPanel(name) { app.panel = name; if (name !== "phone") app.phoneApp = null; refreshPanel(); }
-  function closeSheet() {
-    if (app.panel === "place" && app.sim && app.sim.s.inside && app.sim.s.place !== "home") app.sim.leave();
-    app.panel = null; $("sheet").hidden = true;
-  }
+  function openPanel(name) { const changed = app.panel !== name; app.panel = name; if (name !== "phone") app.phoneApp = null; if (changed) { $("sheet-body").dataset.html = ""; $("sheet-body").scrollTop = 0; } refreshPanel(); if (changed) $("sheet-body").scrollTop = 0; }
+  function closeSheet() { app.panel = null; $("sheet").hidden = true; }
   function refreshPanel() {
     const p = app.panel;
     // Never swap the panel's buttons out from under a press in progress.
@@ -571,7 +809,7 @@
     $("sheet").hidden = !p;
     document.querySelectorAll("#h-nav button").forEach((b) => b.classList.toggle("sel", b.dataset.panel === p));
     if (!p) return;
-    const fn = { place: panelPlace, me: panelMe, bag: panelBag, map: panelMap, phone: panelPhone }[p];
+    const fn = { place: panelPlace, me: panelMe, bag: panelBag, map: panelMap, phone: panelPhone, buy: panelBuy }[p];
     const [title, html] = fn();
     $("sheet-title").textContent = title;
     if ($("sheet-body").dataset.html !== html) {
@@ -601,16 +839,23 @@
       players.forEach((pl) => { html += `<button class="person-chip real" data-player="${esc(pl.username)}"><span class="pc-face">${memo("bust", pl.look)}</span><span><b>@${esc(pl.username)}</b><small>Real player</small></span></button>`; });
       html += `</div>`;
     }
-    html += `<p class="section-title">What will you do?</p><div class="actions">`;
-    sim.actionsAt(id).forEach(({ id: aid, a, why, cost }) => {
+    html += `<p class="section-title">What will you do?</p><p class="muted-sm" style="margin:0">Or click things in the room. Your Sim walks over and does it.</p><div class="actions">`;
+    const list = sim.actionsAt(id);
+    const w = app.world;
+    if (w && w.interior && w.room && w.interiorPlace === id) {
+      const have = new Set(list.map((x) => x.id));
+      w.room.objects.forEach((o) => o.act.forEach((aid) => { if (!have.has(aid) && W.ACTIONS[aid] && !["christmas_lunch", "confess", "crossover"].includes(aid)) { have.add(aid); list.push({ id: aid, a: sim.actionDef(aid), why: sim.blocked(aid, id), cost: sim.actionCost(aid, id) }); } }));
+    }
+    list.forEach(({ id: aid, a, why, cost }) => {
+      if (why === "You're busy") why = null;
       const meta = [aid === "sleep" ? "⏭ until rested" : a.mins ? `⏱ ${S.fmtMins(a.mins)}` : "instant"];
       if (cost) meta.push(`<span class="cost">${naira(cost)}</span>`);
       if (a.gig) meta.push(`<span class="cost">earn ~${naira(a.gig)}</span>`);
-      if (a.fx) meta.push(Object.entries(a.fx).map(([k, v]) => `${D.NEEDS[k].icon}${v > 0 ? "+" : ""}${v}`).join(" "));
+      if (a.fx) meta.push(Object.entries(a.fx).map(([k, v]) => `${(NEEDS[k] || D.NEEDS[k]).icon}${v > 0 ? "+" : ""}${v}`).join(" "));
       html += `<button class="act${a.premium ? " premium" : ""}" data-act="${aid}" ${why ? "disabled" : ""}><span class="at-top"><span class="at-ic">${a.icon}</span>${esc(a.name)}</span><span class="meta">${meta.join(" · ")}</span>${a.desc ? `<span class="meta">${esc(a.desc)}</span>` : ""}${why ? `<span class="why">${esc(why)}</span>` : ""}</button>`;
     });
-    html += `</div><button class="btn wide" data-leave>🚪 Leave</button>`;
-    return [p.name, html];
+    html += `</div>${p.kind === "building" ? `<button class="btn wide" data-leave>🚪 Leave ${esc(p.id === "home" ? "your flat" : p.name)}</button>` : ""}`;
+    return [p.id === "home" ? "Your Flat" : p.name, html];
   }
 
   function panelMe() {
@@ -618,6 +863,12 @@
     const ident = sim.identity();
     const goal = D.GOALS[s.goal];
     let html = `<div class="me-head"><div class="me-face">${memo("svg", s.look)}</div><div><h3>${esc(s.name)}</h3><div class="muted-sm">${P.icon} ${P.name} · ${esc(D.AREAS[s.city][s.area].name)}, ${D.CITIES[s.city].name}</div><div class="ident">${ident.icon} ${ident.name}</div><div class="muted-sm">${s.traits.map((t) => `${D.TRAITS[t].icon} ${D.TRAITS[t].name}`).join(" · ")}</div></div></div>`;
+    const emo = sim.emotion();
+    const mls = sim.moodlets().sort((a, b) => b.w - a.w);
+    html += `<div class="emo-box" style="--c:${emo.color}"><span class="emo-big">${emo.icon}</span><div><b>${emo.intensity}${emo.name}</b><small>${esc(emoHint(emo.id))}</small></div></div>`;
+    html += `<div class="moodlet-list">${mls.map((m) => `<div class="mlr" style="--c:${SIMS.EMOTIONS[m.emotion].color}"><span>${m.icon}</span><div><b>${esc(m.label)}</b><small>${SIMS.EMOTIONS[m.emotion].name} +${m.w}${m.until ? ` · ${S.fmtMins(Math.max(1, Math.round(m.until - s.t)))} left` : ""}</small></div></div>`).join("") || `<p class="muted-sm">No moodlets right now.</p>`}</div>`;
+    html += `<p class="section-title">Needs</p><div class="needs-grid">${Object.keys(NEEDS).map((k) => `<div class="need-row"><span>${NEEDS[k].icon} ${NEEDS[k].label}</span><div class="bar ${s.needs[k] >= 55 ? "" : s.needs[k] >= 30 ? "mid" : "lo"}"><i style="width:${Math.round(s.needs[k])}%"></i></div></div>`).join("")}</div>`;
+    html += `<p class="section-title">Skills</p><div class="skills">${Object.entries(SIMS.SKILLS).map(([k, sk]) => { const lv = sim.skill(k); return `<div class="skill" title="${esc(sk.desc)}"><span class="sk-ic">${sk.icon}</span><div><b>${sk.name} <em>Lv ${lv}</em></b><div class="pips">${Array.from({ length: 10 }, (_, i) => `<i class="${i < lv ? "on" : i === lv ? "part" : ""}" ${i === lv ? `style="--p:${Math.round(sim.skillProgress(k) * 100)}%"` : ""}></i>`).join("")}</div><small>${esc(sk.desc)}</small></div></div>`; }).join("")}</div>`;
     const why = sim.abilityBlocked();
     html += `<div class="ability"><b>${P.ability.icon} ${P.ability.name}</b><p>${esc(P.good)}</p><p class="muted-sm">${esc(P.bad)}</p><button class="btn primary" data-ability ${why ? "disabled" : ""}>${why ? esc(why) : "Use it"}</button></div>`;
     html += `<div class="stats4">${[["📱", "Clout", s.clout], ["🤝🏾", "Reputation", s.rep], ["🔗", "Connections", s.conn], ["👥", "Followers", compact(s.followers)]].map(([i, l, v]) => `<div class="stat"><small>${i} ${l}</small><b>${typeof v === "number" ? Math.round(v) : v}</b></div>`).join("")}</div>`;
@@ -635,8 +886,11 @@
       const st = s.npcs[n.id];
       const mem = st.memory.length ? st.memory[st.memory.length - 1].tag : null;
       const memLabel = { helped: "you helped them", lied: "you lied to them", exposed: "you exposed them", gaveMoney: "you gave them money", embarrassed: "you embarrassed them", flirted: "you flirted", ignored: "you ignored them", attended: "you showed up for them", revealedSecret: "you spread their secret", blackmailed: "you blackmailed them", protected: "you kept their secret", gifted: "you gave a gift" }[mem];
-      html += `<div class="rel-row"><span class="pc-face">${memo("bust", n.look)}</span><div><b>${esc(n.name)}</b> <small>${sim.relLevel(n.id)}${memLabel ? " · remembers " + memLabel : ""}</small><div class="bar"><i style="width:${Math.round(st.rel)}%"></i></div>${n.secret ? `<small>${st.secret >= 100 ? "🕵🏾 " + esc(n.secret) : `What you know: ${Math.round(st.secret)}%`}</small>` : ""}</div></div>`;
+      const rom = n.romance && !n.family;
+      html += `<div class="rel-row"><span class="pc-face">${memo("bust", n.look)}</span><div><b>${esc(n.name)}</b> <small>${sim.relLevel(n.id)}${memLabel ? " · remembers " + memLabel : ""}</small><div class="relbars"><span title="Friendship">❤️</span><div class="bar"><i style="width:${Math.round(st.rel)}%"></i></div>${rom ? `<span title="Romance">💞</span><div class="bar pink"><i style="width:${Math.round(st.romance)}%"></i></div>` : ""}</div>${n.secret ? `<small>${st.secret >= 100 ? "🕵🏾 " + esc(n.secret) : `What you know: ${Math.round(st.secret)}%`}</small>` : ""}</div></div>`;
     });
+    const friends = s.strangers.filter((x) => x.met).sort((a, b) => b.rel - a.rel).slice(0, 8);
+    friends.forEach((x) => { html += `<div class="rel-row"><span class="pc-face">${memo("bust", x.look)}</span><div><b>${esc(x.name)}</b> <small>${sim.relLevel(x.id)} · met around town</small><div class="relbars"><span>❤️</span><div class="bar"><i style="width:${Math.round(x.rel)}%"></i></div></div></div></div>`; });
     html += `</div>`;
     // Groups.
     html += `<p class="section-title">Friendship groups</p><div class="groups">`;
@@ -647,7 +901,33 @@
       html += `<div class="grp ${ok ? "in" : ""}">${g.icon} ${g.name}<small>${ok ? "They accept you" : `${Math.round(avg)}/50`}</small></div>`;
     });
     html += `</div>`;
-    return ["Me", html];
+    return ["Your Sim", html];
+  }
+
+  function emoHint(id) {
+    return {
+      fine: "Steady. Nothing special going on.", happy: "Things land a bit better. Skills grow a little faster.", confident: "Socials succeed more often and your posts travel further.",
+      flirty: "Romantic socials work much better.", energized: "Fitness and dancing skills grow faster.", playful: "Jokes and mischief land better.", focused: "Gigs pay more; hustle grows faster.",
+      inspired: "Photography grows faster and posts do numbers.", tense: "Socials are harder; you're more likely to snap.", sad: "Socials, especially romance, are harder.",
+      angry: "Friendly and romantic socials fail more. Mean ones hit harder.", embarrassed: "Socials are harder until it passes.", uncomfortable: "Fix your needs: socials and skills suffer.", bored: "Do something fun. Skills grow slower.",
+    }[id] || "";
+  }
+  // Buy mode: upgrade your flat. Furniture shows up in your room right away.
+  function panelBuy() {
+    const sim = app.sim, s = sim.s;
+    const atHome = s.place === "home" && s.inside;
+    let html = `<p class="muted-sm" style="margin:0">${atHome ? "Upgrades are delivered instantly and show up in your flat." : "Go home to shop for your flat."} You have <b>${naira(s.naira)}</b>${s.usd ? ` and $${Math.round(s.usd)}` : ""}.</p>`;
+    Object.entries(SIMS.FURNITURE).forEach(([k, F]) => {
+      const cur = sim.furnitureTier(k);
+      html += `<div class="buy-row"><div class="buy-head"><span class="bi">${F.icon}</span><div><b>${F.name}</b><small>${cur >= 0 ? "You have: " + esc(F.tiers[cur].name) : "You don't have one"}</small></div></div><div class="buy-tiers">`;
+      F.tiers.forEach((t, i) => {
+        const owned = i <= cur;
+        const afford = sim.canAfford(t.price);
+        html += `<button class="buy-tier${owned ? " owned" : ""}" data-buy="${k}" data-tier="${i}" ${owned || !atHome || !afford ? "disabled" : ""}><b>${esc(t.name)}</b><small>${esc(t.note)}</small><em>${owned ? "✓ Owned" : t.price ? naira(t.price) : "Free"}</em></button>`;
+      });
+      html += `</div></div>`;
+    });
+    return ["🛋️ Buy Mode", html];
   }
 
   function panelBag() {
@@ -817,7 +1097,7 @@
   });
   document.querySelectorAll(".modal").forEach((m) => m.addEventListener("click", (e) => { if (e.target === m && m.id !== "m-event") m.hidden = true; }));
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") { closeModals(); if (app.panel) { closeSheet(); renderHud(true); } }
+    if (e.key === "Escape") { closeModals(); if (app.pie) closePie(); else if (app.panel) { closeSheet(); renderHud(true); } }
     if (!app.sim || !document.getElementById("screen-game").classList.contains("active") || /INPUT|TEXTAREA/.test(e.target.tagName)) return;
     const k = e.key.toLowerCase();
     if (k === "m") { app.panel === "map" ? closeSheet() : openPanel("map"); }
@@ -888,7 +1168,7 @@
     $("btn-logout").textContent = app.online && app.user ? "Log out" : "Back to the city";
     openModal("m-menu");
   });
-  $("act-stop").addEventListener("click", () => { app.sim.cancelActivity(); renderHud(true); });
+  $("act-stop").addEventListener("click", () => { app.sim.cancelActivity(); clearQueue(); renderHud(true); });
   $("h-interact").addEventListener("click", interact);
   $("sheet-close").addEventListener("click", () => { closeSheet(); renderHud(true); });
   $("ev-choices").addEventListener("click", (e) => { const b = e.target.closest("[data-choice]"); if (b && !b.disabled) { app.sim.choose(Number(b.dataset.choice)); $("m-event").dataset.k = ""; renderHud(true); } });
@@ -905,9 +1185,17 @@
     const b = e.target.closest("button, [data-place]");
     if (!b || b.disabled) return;
     const d = b.dataset;
-    if (d.act) { if (sim.start(d.act)) { const a = sim.actionDef(d.act); if (a.mins) toast(`${a.icon} ${a.name}…`); } renderHud(true); return; }
-    if (d.leave !== undefined) { closeSheet(); renderHud(true); return; }
-    if (d.talk) { sim.talk(d.talk); renderHud(true); return; }
+    if (d.act) { queueAction(d.act); if (window.innerWidth < 900) closeSheet(); renderHud(true); return; }
+    if (d.leave !== undefined) {
+      closeSheet();
+      const w = app.world;
+      if (w.interior && w.room) queueAction("exit", w.room.objects.find((o) => o.k === "door"));
+      else sim.leave();
+      renderHud(true);
+      return;
+    }
+    if (d.buy) { if (sim.buyFurniture(d.buy, Number(d.tier))) toast(lastLog(), "good"); refreshPanel(); renderHud(true); return; }
+    if (d.talk) { closeSheet(); openPie({ kind: "person", id: d.talk }, window.innerWidth / 2, window.innerHeight / 2); return; }
     if (d.player) { openPlayer(d.player); return; }
     if (d.ability !== undefined) { sim.useAbility(); renderHud(true); return; }
     if (d.wear) { sim.wear(d.wear); refreshPanel(); return; }
@@ -915,7 +1203,7 @@
     if (d.place || d.mapsel) { app.mapSel = d.place || d.mapsel; refreshPanel(); return; }
     if (d.ride) {
       const to = app.mapSel;
-      if (d.ride === "walk") { if (app.world.interior) app.world.exitHome(); sim.leave(); app.world.walkTo(to); closeSheet(); toast(`🚶🏾 Walking to ${sim.placeName(to)}…`); }
+      if (d.ride === "walk") { clearQueue(); queueVisit(to); closeSheet(); toast(`🚶🏾 Walking to ${sim.placeName(to)}…`); }
       else if (sim.travel(to, d.ride)) { app.world.leaveInterior(); closeSheet(); }
       renderHud(true);
       return;
@@ -926,7 +1214,17 @@
   });
   $("sheet-body").addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && e.target.dataset.place) { e.preventDefault(); app.mapSel = e.target.dataset.place; refreshPanel(); } });
 
-  ["sheet", "dialog", "m-event"].forEach((id) => {
+  $("pie").addEventListener("click", pieClick);
+  $("h-queue").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-q]");
+    if (!b || !app.sim) return;
+    const q = b.dataset.q;
+    if (q === "act") app.sim.cancelActivity();
+    else if (q === "cur") { app.world.cancelWalk(); app.qCur = null; }
+    else app.queue.splice(Number(q), 1);
+    renderHud(true);
+  });
+  ["sheet", "dialog", "m-event", "pie", "h-queue"].forEach((id) => {
     $(id).addEventListener("pointerdown", () => { app.pressing = true; });
   });
   window.addEventListener("pointerup", () => { setTimeout(() => { app.pressing = false; }, 0); });

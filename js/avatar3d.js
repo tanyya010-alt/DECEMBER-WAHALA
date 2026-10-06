@@ -63,7 +63,10 @@
     const root = new THREE.Group();
     const pivot = (x, y, z) => { const g = new THREE.Group(); g.position.set(x, y, z); root.add(g); return g; };
     const into = (g, m) => { m.position.sub(g.position); g.add(m); return m; };
-    const legs = [], arms = [];
+    const legs = [], arms = [], knees = [], elbows = [];
+    // A joint inside a limb pivot (knee or elbow), at a model-space point.
+    const joint = (g, x, y, z) => { const j = new THREE.Group(); j.position.set(x - g.position.x, y - g.position.y, z - g.position.z); g.add(j); return j; };
+    const intoJ = (g, j, m) => { m.position.sub(g.position).sub(j.position); j.add(m); return m; };
     const w = look.body === "woman";
     const fit = window.Avatar.outfitFor(look);
     const skinC = hex(D.SKIN[look.skin] || D.SKIN[3]);
@@ -88,20 +91,22 @@
       const g = pivot(x, 0.86, 0);
       legs.push(g);
       into(g, limb([x, 0.86, 0], [x * 1.05, 0.46, 0], legR, pants || fit.bottom === "shorts" ? bottom : skin));
-      into(g, limb([x * 1.05, 0.46, 0], [x * 1.1, 0.07, 0.01], pants ? legR * 0.85 : 0.048, pants ? bottom : skin));
+      const kj = joint(g, x * 1.05, 0.46, 0);
+      knees.push(kj);
+      intoJ(g, kj, limb([x * 1.05, 0.46, 0], [x * 1.1, 0.07, 0.01], pants ? legR * 0.85 : 0.048, pants ? bottom : skin));
       const knee = sphere(pants ? legR * 0.85 : 0.048, pants ? bottom : skin, 7, 5);
       knee.position.set(x * 1.05, 0.46, 0);
-      into(g, knee);
+      intoJ(g, kj, knee);
       let shoe;
       if (shoeType === "boots") {
-        into(g, limb([x * 1.1, 0.42, 0.01], [x * 1.1, 0.04, 0.02], 0.06, dark));
+        intoJ(g, kj, limb([x * 1.1, 0.42, 0.01], [x * 1.1, 0.04, 0.02], 0.06, dark));
         shoe = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.07, 0.2), dark);
       } else {
         const col = { sneakers: 0xf4f4f2, heels: baseC, loafers: 0x5a3a22, sandals: 0x8a5a32, slippers: 0x2b4c9b }[shoeType] || 0x333333;
         shoe = new THREE.Mesh(new THREE.BoxGeometry(0.09, shoeType === "sneakers" ? 0.08 : shoeType === "slippers" ? 0.025 : 0.05, 0.2), lambert(col));
       }
       shoe.position.set(x * 1.1, shoeType === "slippers" ? 0.015 : 0.035, 0.05);
-      into(g, shoe);
+      intoJ(g, kj, shoe);
     });
 
     // ---- hips and torso
@@ -151,14 +156,16 @@
       const g = pivot(...sh);
       arms.push(g);
       into(g, limb(sh, el, sleeve ? (fit.top === "tee" ? 0.07 : 0.058) : 0.048, sleeve ? main : skin));
+      const ej = joint(g, ...el);
+      elbows.push(ej);
       const elbow = sphere(sleeve === "full" ? 0.05 : 0.041, sleeve === "full" ? main : skin, 7, 5);
       elbow.position.set(...el);
-      into(g, elbow);
-      into(g, limb(el, wr, sleeve === "full" ? 0.052 : 0.042, sleeve === "full" ? main : skin));
+      intoJ(g, ej, elbow);
+      intoJ(g, ej, limb(el, wr, sleeve === "full" ? 0.052 : 0.042, sleeve === "full" ? main : skin));
       const hand = sphere(0.042, skin);
       hand.position.set(wr[0], wr[1] - 0.04, wr[2]);
-      into(g, hand);
-      if (look.watch && sd < 0) { const wt = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.03, 0.06), gold); wt.position.set(wr[0], wr[1] + 0.02, wr[2]); into(g, wt); }
+      intoJ(g, ej, hand);
+      if (look.watch && sd < 0) { const wt = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.03, 0.06), gold); wt.position.set(wr[0], wr[1] + 0.02, wr[2]); intoJ(g, ej, wt); }
       if (["corset", "minidress", "midi", "crop", "gown"].includes(fit.top)) {
         add(limb([sd * 0.08, 1.46, 0.03], [sd * 0.09, 1.33, 0.08], 0.008, main));
       }
@@ -300,7 +307,7 @@
     }
     const wide = look.build === "slim" ? 0.92 : look.build === "curvy" ? 1.1 : 1;
     root.scale.set(wide, 1, wide);
-    root.userData.limbs = { legs, arms };
+    root.userData.limbs = { legs, arms, knees, elbows };
     return root;
   }
 
