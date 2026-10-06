@@ -807,6 +807,7 @@
     // Never swap the panel's buttons out from under a press in progress.
     if (app.pressing && p && !$("sheet").hidden) return;
     $("sheet").hidden = !p;
+    $("sheet").classList.toggle("phone", p === "phone");
     document.querySelectorAll("#h-nav button").forEach((b) => b.classList.toggle("sel", b.dataset.panel === p));
     if (!p) return;
     const fn = { place: panelPlace, me: panelMe, bag: panelBag, map: panelMap, phone: panelPhone, buy: panelBuy }[p];
@@ -814,7 +815,11 @@
     $("sheet-title").textContent = title;
     if ($("sheet-body").dataset.html !== html) {
       const sc = $("sheet-body").scrollTop;
+      const inner = $("sheet-body").querySelector("[data-keep-scroll]");
+      const isc = inner ? inner.scrollTop : 0;
       $("sheet-body").innerHTML = html;
+      const inner2 = $("sheet-body").querySelector("[data-keep-scroll]");
+      if (inner2) inner2.scrollTop = isc;
       $("sheet-body").dataset.html = html;
       $("sheet-body").scrollTop = sc;
     }
@@ -973,55 +978,98 @@
     return ["Map", html];
   }
 
+  // The phone looks and works like an iPhone: status bar, home screen, dock, apps.
+  const PHONE_APPS = [
+    ["chowdeck", "🛵", "Chowdeck", "#ff5f6d", "#e5245a"],
+    ["calendar", "📅", "Calendar", "#ffffff", "#e9edf3", "#1b2232"],
+    ["gist", "📰", "Lagos Gist", "#ff7a59", "#d9480f"],
+    ["maps", "🗺️", "Maps", "#5ed37b", "#1f9d55"],
+    ["jumia", "🛋️", "Jumia Home", "#ffb547", "#f57f17"],
+    ["wardrobe", "👠", "Wardrobe", "#d77bff", "#9b3fe0"],
+    ["missions", "👑", "Detty Goals", "#2b3a4a", "#0f1720"],
+    ["me", "🪪", "My Sim", "#4fc3f7", "#1e6fd9"],
+    ["camera", "📷", "Camera", "#9aa5b1", "#4b5563"],
+    ["settings", "⚙️", "Settings", "#b0b8c4", "#6b7280"],
+  ];
+  const PHONE_DOCK = [["chats", "💬", "WhatsApp", "#5ef08a", "#16a34a"], ["gram", "📸", "Gram", "#feda75", "#d62976"], ["ride", "🚗", "Bolt", "#3ddc84", "#0f7a3a"], ["bank", "🏦", "Bank", "#a78bfa", "#6d28d9"]];
+  const FOOD = [["jollof_pack", 4500, "Mama T's party jollof with plantain"], ["chicken_bucket", 12000, "Chop Republic spicy bucket (share it!)"]];
+  function phoneIcon([id, icon, name, c1, c2, fg], badge) {
+    return `<button class="ip-app" data-app="${id}"><span class="ip-ic" style="background:linear-gradient(160deg,${c1},${c2});${fg ? `color:${fg}` : ""}">${icon}</span><span class="ip-name">${esc(name)}</span>${badge ? `<i class="ip-badge">${badge > 9 ? "9+" : badge}</i>` : ""}</button>`;
+  }
+  function phoneShell(inner, home) {
+    const sim = app.sim, s = sim.s, c = sim.clock();
+    const batt = Math.round(s.needs.energy);
+    const skyline = `<svg class="ip-skyline" viewBox="0 0 400 120" preserveAspectRatio="none" aria-hidden="true"><path d="M0 120V78h22V60h18v18h14V40h26v38h10V52h20v26h16V30h8V18h6v12h8v48h18V58h24v20h12V44h30v34h10V66h16V36h22v42h14V54h20v24h12V62h18v16h22v42z"/></svg>`;
+    return `<div class="iphone${home ? " home" : ""}"><button class="ip-close" data-app="__close" aria-label="Close phone">✕</button><div class="ip-screen">${home ? skyline : ""}
+      <div class="ip-status"><b>${c.label.replace(" ", "")}</b><span class="ip-island"></span><span class="ip-sig"><i></i><i></i><i></i> 4G <span class="ip-batt${batt < 20 ? " low" : ""}"><i style="width:${batt}%"></i></span></span></div>
+      <div class="ip-body" data-keep-scroll>${inner}</div>
+      <button class="ip-homebar" data-app="${home ? "__close" : ""}" aria-label="${home ? "Close phone" : "Home screen"}"></button>
+    </div></div>`;
+  }
+  function phoneApp(title, inner, back = "", backLabel = "Home") {
+    return `<div class="ip-nav"><button class="ip-back" data-app="${back}">‹ ${esc(backLabel)}</button><b>${esc(title)}</b></div><div class="ip-page">${inner}</div>`;
+  }
   function panelPhone() {
     const sim = app.sim, s = sim.s;
     const a = app.phoneApp;
     if (!a) {
-      const apps = [["chats", "💬", "WhatsApp", s.phone.unread], ["gram", "📸", "Gram"], ["bank", "🏦", "Bank"], ["ride", "🚗", "Ride"], ["calendar", "📅", "Calendar"], ["missions", "🎯", "Missions"]];
-      return ["Phone", `<div class="apps">${apps.map(([id, i, n, b]) => `<button class="app-icon" data-app="${id}"><span>${i}</span>${n}${b ? `<i class="badge">${b}</i>` : ""}</button>`).join("")}</div><p class="section-title">Latest</p>${s.log.slice(0, 6).map((l) => `<p class="feed-line ${l.type}"><small>${l.day} Dec · ${l.time}</small>${esc(l.text)}</p>`).join("")}`];
+      const grid = PHONE_APPS.map((x) => phoneIcon(x)).join("");
+      const dock = PHONE_DOCK.map((x) => phoneIcon(x, x[0] === "chats" ? s.phone.unread : 0)).join("");
+      const c = sim.clock(), nx = sim.nextEvent();
+      const widgets = `<div class="ip-widgets"><button class="ip-widget wcal" data-app="calendar"><small>${c.weekday.toUpperCase()}</small><b>${c.day}</b><span>${nx ? `${W.TYPES[nx.place].icon} ${esc(nx.name)}<br>${esc(nx.label)}` : "No events left"}</span></button><button class="ip-widget money" data-app="bank"><small>🏦 BALANCE</small><b>${naira(s.naira)}</b><span>${s.usd ? `$${Math.round(s.usd).toLocaleString()} · ` : ""}$1 = ${naira(s.fx)}</span></button></div>`;
+      return ["Phone", phoneShell(`<div>${widgets}<div class="ip-grid">${grid}</div></div><div class="ip-dock">${dock}</div>`, true)];
     }
-    const back = `<button class="linkbtn" data-app="">‹ Apps</button>`;
     if (a === "chats") {
       sim.readAll();
       const threads = {};
       s.phone.messages.forEach((m) => { (threads[m.from] = threads[m.from] || []).push(m); });
-      let html = back + `<div class="threads">`;
+      let html = `<div class="threads">`;
       Object.entries(threads).forEach(([from, ms]) => {
         const pending = ms.some((m) => m.choices && !m.done);
         const n = sim.npcDef(from);
         html += `<button class="thread" data-app="thread:${esc(from)}"><span class="pc-face">${n ? memo("bust", n.look) : "💬"}</span><span><b>${esc(sim.senderName(from))}</b><small>${esc(ms[0].text.slice(0, 70))}</small></span>${pending ? `<i class="badge">!</i>` : ""}</button>`;
       });
       if (!s.phone.messages.length) html += `<p class="muted-sm">No messages yet. Make friends — they'll text.</p>`;
-      return ["WhatsApp", html + `</div>`];
+      return ["WhatsApp", phoneShell(phoneApp("Chats", html + `</div>`))];
     }
     if (a.startsWith("thread:")) {
       const from = a.slice(7);
       const ms = s.phone.messages.filter((m) => m.from === from).slice().reverse();
-      let html = `<button class="linkbtn" data-app="chats">‹ Chats</button><div class="bubbles">`;
+      let html = `<div class="bubbles">`;
       ms.forEach((m) => {
         html += `<div class="bubble"><small>${S.clock(m.t).day} Dec · ${S.clock(m.t).label}</small>${esc(m.text)}</div>`;
         if (m.choices && !m.done) html += `<div class="replies">${m.choices.map((c, i) => `<button class="btn sm" data-reply="${m.id}" data-i="${i}" ${sim.canChoose(c) ? "" : "disabled"}>${esc(c.label)}${c.cost ? ` (−${naira(c.cost)})` : ""}</button>`).join("")}</div>`;
         if (m.done) html += `<div class="bubble mine">${esc(m.done)}</div>`;
       });
-      return [sim.senderName(from), html + `</div>`];
+      return [sim.senderName(from), phoneShell(phoneApp(sim.senderName(from), html + `</div>`, "chats", "Chats"))];
     }
     if (a === "gram") {
       const busy = s.activity || s.ride || s.event;
-      let html = back + `<div class="gram-head"><div class="pc-face big">${memo("bust", s.look)}</div><div><b>@${esc((app.user && app.user.username) || s.name.toLowerCase())}</b><small>${compact(s.followers)} followers · ${s.stats.posts} posts</small></div></div>`;
+      let html = `<div class="gram-head"><div class="pc-face big">${memo("bust", s.look)}</div><div><b>@${esc((app.user && app.user.username) || s.name.toLowerCase())}</b><small>${compact(s.followers)} followers · ${s.stats.posts} posts</small></div></div>`;
       html += `<button class="btn primary wide" data-post ${busy ? "disabled" : ""}>📸 Post from ${esc(sim.placeName(s.place || "home"))}</button>`;
       html += s.phone.posts.map((p) => `<div class="post"><b>${p.icon} ${esc(p.place)}</b><small>${S.clock(p.t).day} Dec · ❤️ ${p.likes.toLocaleString()} · +${p.gain} followers</small>${p.comments.map((c) => `<p class="${p.drama && c === p.comments[p.comments.length - 1] ? "drama" : ""}">💬 ${esc(c)}</p>`).join("")}</div>`).join("") || `<p class="muted-sm">No posts yet. The Detty Wall, the club and concerts get the most likes.</p>`;
-      return ["Gram", html];
+      return ["Gram", phoneShell(phoneApp("Gram", html))];
     }
     if (a === "bank") {
-      let html = back + `<div class="stats4"><div class="stat"><small>Naira</small><b>${naira(s.naira)}</b></div><div class="stat"><small>Dollars</small><b>$${Math.round(s.usd).toLocaleString()}</b></div><div class="stat"><small>Today's rate</small><b>${naira(s.fx)}</b></div><div class="stat"><small>Earned</small><b>${naira(s.stats.earned)}</b></div></div>`;
+      let html = `<div class="stats4"><div class="stat"><small>Naira</small><b>${naira(s.naira)}</b></div><div class="stat"><small>Dollars</small><b>$${Math.round(s.usd).toLocaleString()}</b></div><div class="stat"><small>Today's rate</small><b>${naira(s.fx)}</b></div><div class="stat"><small>Earned</small><b>${naira(s.stats.earned)}</b></div></div>`;
       html += s.flags.loan ? `<p class="secretbox">📝 Loan due before you leave December: <b>${naira(s.flags.loan)}</b>. Repay at the bank.</p>` : "";
       html += `<p class="muted-sm">Change dollars at ${esc(sim.places.bdc.name)} (best rate) or the mall desk. ${s.persona === "ijgb" ? "As an IJGB, you can also pay in dollars anywhere when your naira runs out." : ""}</p>`;
-      return ["Bank", html];
+      return ["Bank", phoneShell(phoneApp("Bank", html))];
     }
-    if (a === "ride") { app.panel = "map"; return panelMap(); }
+    if (a === "chowdeck") {
+      let html = `<p class="muted-sm" style="margin:0">Hungry? A rider brings it to you anywhere in ${D.CITIES[s.city].name}. Delivery ₦1,500.</p>`;
+      html += FOOD.map(([k, price, note]) => { const it = W.ITEMS[k], total = price + 1500; return `<div class="inv-item"><span class="ii">${it.icon}</span><div><b>${esc(it.name)}</b><small>${esc(note)} · ${naira(total)}</small></div><button class="btn sm primary" data-order="${k}" ${sim.canAfford(total) ? "" : "disabled"}>Order</button></div>`; }).join("");
+      return ["Chowdeck", phoneShell(phoneApp("Chowdeck", html))];
+    }
+    if (a === "gist") {
+      const news = app.online && app.user && app.city.feed.length ? app.city.feed.map((f) => f.text) : [W.phase(sim.day()).name + ": " + W.phase(sim.day()).blurb, ...HEADLINES];
+      let html = `<p class="section-title">Trending in ${D.CITIES[s.city].name}</p>${news.slice(0, 6).map((t) => `<p class="feed-line">${esc(t)}</p>`).join("")}`;
+      html += `<p class="section-title">Your timeline</p>${s.log.slice(0, 12).map((l) => `<p class="feed-line ${l.type}"><small>${l.day} Dec · ${l.time}</small>${esc(l.text)}</p>`).join("")}`;
+      return ["Lagos Gist", phoneShell(phoneApp("Lagos Gist", html))];
+    }
     if (a === "calendar") {
       const c = sim.clock();
-      let html = back + `<div class="cal">`;
+      let html = `<div class="cal">`;
       for (let d = 1; d <= 31; d++) {
         const ev = W.eventsOn(d);
         const icons = ev.map((e) => ({ concert: "🎤", owambe: "🎊", beachparty: "🏖️", christmas: "🎄", crossover: "🎆" }[e])).join("");
@@ -1030,17 +1078,18 @@
       html += `</div><p class="section-title">${esc(W.phase(c.day).name)}</p><p class="muted-sm">${esc(W.phase(c.day).blurb)}</p>`;
       const plans = s.plans.filter((p) => p.status === "pending");
       if (plans.length) html += `<p class="section-title">Your plans</p>` + plans.map((p) => `<p class="feed-line">📅 ${esc(sim.placeName(p.place))} · ${S.clock(p.start).weekday} ${S.clock(p.start).label}${p.npc ? " with " + esc(sim.who(p.npc).name) : ""}</p>`).join("");
-      return ["Calendar", html];
+      return ["Calendar", phoneShell(phoneApp("December", html))];
     }
     if (a === "missions") {
-      let html = back + sim.quests().map((q) => `<div class="quest big${q.done ? " done" : ""}"><span class="qi">${q.icon}</span><div><b>${esc(q.title)}</b><small>${esc(q.sub)}</small></div></div>`).join("");
+      let html = sim.quests().map((q) => `<div class="quest big${q.done ? " done" : ""}"><span class="qi">${q.icon}</span><div><b>${esc(q.title)}</b><small>${esc(q.sub)}</small></div></div>`).join("");
       const ident = sim.identity();
       html += `<p class="section-title">December reputation</p><p class="ident big">${ident.icon} ${ident.name}</p>`;
       html += `<p class="section-title">Achievements</p><div class="badges">${Object.entries(W.ACHIEVEMENTS).map(([k, a2]) => `<div class="badge ${s.achievements.includes(k) ? "" : "locked"}" title="${esc(a2.desc)}"><i>${a2.icon}</i>${a2.name}</div>`).join("")}</div>`;
       html += `<p class="section-title">Memories</p><ul class="memories">${s.memories.map((m) => `<li>${esc(m)}</li>`).join("") || "<li>None yet.</li>"}</ul>`;
-      return ["Missions", html];
+      return ["Detty Goals", phoneShell(phoneApp("Detty Goals", html))];
     }
-    return ["Phone", back];
+    app.phoneApp = null;
+    return panelPhone();
   }
 
   // ------------------------------------------------------------------ ending
@@ -1159,7 +1208,7 @@
   // HUD controls.
   $("h-speed").addEventListener("click", (e) => { const b = e.target.closest("[data-speed]"); if (b && app.sim) { app.sim.s.speed = Number(b.dataset.speed); renderHud(); } });
   $("h-nav").addEventListener("click", (e) => { const b = e.target.closest("[data-panel]"); if (!b) return; if (app.panel === b.dataset.panel) closeSheet(); else openPanel(b.dataset.panel); renderHud(true); });
-  $("h-phone-btn").addEventListener("click", () => { openPanel("phone"); app.phoneApp = "chats"; refreshPanel(); renderHud(true); });
+  $("h-phone-btn").addEventListener("click", () => { if (app.panel === "phone") { closeSheet(); renderHud(true); return; } openPanel("phone"); app.phoneApp = app.sim && app.sim.s.phone.unread ? "chats" : null; refreshPanel(); renderHud(true); });
   $("h-face").addEventListener("click", () => { openPanel("me"); renderHud(true); });
   $("h-ability").addEventListener("click", () => { app.sim.useAbility(); renderHud(true); });
   $("h-clean").addEventListener("click", () => { $("hud").classList.toggle("clean"); $("h-clean").textContent = $("hud").classList.contains("clean") ? "⌄ Show HUD" : "⌃ Clean screen"; });
@@ -1208,7 +1257,16 @@
       renderHud(true);
       return;
     }
-    if (d.app !== undefined) { app.phoneApp = d.app || null; if (d.app === "ride") { app.panel = "map"; } refreshPanel(); return; }
+    if (d.app !== undefined) {
+      const id = d.app;
+      if (id === "__close") { closeSheet(); renderHud(true); return; }
+      const jump = { ride: "map", maps: "map", jumia: "buy", wardrobe: "bag", me: "me" }[id];
+      if (jump) { openPanel(jump); renderHud(true); return; }
+      if (id === "settings") { closeSheet(); $("h-menu").click(); return; }
+      if (id === "camera") { if (!(sim.s.activity || sim.s.ride || sim.s.event)) sim.log("📸" + sim.post(sim.s.place || "home"), "good"); app.phoneApp = "gram"; refreshPanel(); renderHud(true); return; }
+      app.phoneApp = id || null; refreshPanel(); return;
+    }
+    if (d.order) { if (sim.orderFood(d.order)) toast(lastLog(), "good"); refreshPanel(); renderHud(true); return; }
     if (d.reply) { sim.reply(d.reply, Number(d.i)); refreshPanel(); renderHud(true); return; }
     if (d.post !== undefined) { sim.log("📸" + sim.post(sim.s.place || "home"), "good"); refreshPanel(); renderHud(true); }
   });
@@ -1228,6 +1286,8 @@
     $(id).addEventListener("pointerdown", () => { app.pressing = true; });
   });
   window.addEventListener("pointerup", () => { setTimeout(() => { app.pressing = false; }, 0); });
+  // A finished press is a click: let its handler redraw panels straight away.
+  window.addEventListener("click", () => { app.pressing = false; }, true);
   window.addEventListener("pointercancel", () => { app.pressing = false; });
 
   // Joystick for touch screens.

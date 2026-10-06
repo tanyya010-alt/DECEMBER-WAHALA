@@ -1472,6 +1472,18 @@
       this.log(`${so.icon} ${who.name} came over: ${lines[a.sid] || "\"Hey!\""}`, mean ? "bad" : "good");
     }
 
+    // Food delivery from the phone (Chowdeck).
+    orderFood(item) {
+      const s = this.s, prices = { jollof_pack: 4500, chicken_bucket: 12000 };
+      if (!prices[item] || s.over) return false;
+      const total = prices[item] + 1500;
+      if (!this.canAfford(total)) { this.log(`Chowdeck: you need ${naira(total)}.`, "bad"); return false; }
+      this.pay(total);
+      s.inventory[item] = (s.inventory[item] || 0) + 1;
+      this.log(`🛵 Chowdeck rider delivered your ${W.ITEMS[item].name.toLowerCase()} (−${naira(total)}). Eat it from your bag or share it.`, "good");
+      return true;
+    }
+
     // ============================================================ buy mode
     furnitureTier(kind) { const v = this.s.home[kind]; return v === undefined ? -1 : v; }
     buyFurniture(kind, tier) {
