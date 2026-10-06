@@ -483,6 +483,7 @@
 
   // ------------------------------------------------------------------ events and dialogue
   function renderEvent() {
+    if (app.pressing) return;
     const sim = app.sim, ev = sim.s.event;
     const showIt = !!ev && !sim.s.convo;
     $("m-event").hidden = !showIt;
@@ -500,6 +501,7 @@
     }).join("");
   }
   function renderDialog() {
+    if (app.pressing) return;
     const sim = app.sim, c = sim.s.convo, pt = app.playerTalk;
     $("dialog").hidden = !c && !pt;
     if (!c && !pt) { $("dialog").dataset.k = ""; return; }
@@ -564,6 +566,8 @@
   }
   function refreshPanel() {
     const p = app.panel;
+    // Never swap the panel's buttons out from under a press in progress.
+    if (app.pressing && p && !$("sheet").hidden) return;
     $("sheet").hidden = !p;
     document.querySelectorAll("#h-nav button").forEach((b) => b.classList.toggle("sel", b.dataset.panel === p));
     if (!p) return;
@@ -819,7 +823,7 @@
     if (k === "m") { app.panel === "map" ? closeSheet() : openPanel("map"); }
     if (k === "p") { app.panel === "phone" ? closeSheet() : openPanel("phone"); }
     if (k === "b" || k === "i") { app.panel === "bag" ? closeSheet() : openPanel("bag"); }
-    if (k === " " && !e.repeat) { e.preventDefault(); app.sim.s.speed = app.sim.s.speed ? 0 : 1; renderHud(); }
+    if (k === " " && !e.repeat) { e.preventDefault(); if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); app.sim.s.speed = app.sim.s.speed ? 0 : 1; renderHud(); }
     if (["1", "2", "3"].includes(k)) app.sim.s.speed = Number(k);
   });
 
@@ -921,6 +925,12 @@
     if (d.post !== undefined) { sim.log("📸" + sim.post(sim.s.place || "home"), "good"); refreshPanel(); renderHud(true); }
   });
   $("sheet-body").addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && e.target.dataset.place) { e.preventDefault(); app.mapSel = e.target.dataset.place; refreshPanel(); } });
+
+  ["sheet", "dialog", "m-event"].forEach((id) => {
+    $(id).addEventListener("pointerdown", () => { app.pressing = true; });
+  });
+  window.addEventListener("pointerup", () => { setTimeout(() => { app.pressing = false; }, 0); });
+  window.addEventListener("pointercancel", () => { app.pressing = false; });
 
   // Joystick for touch screens.
   (function joystick() {
