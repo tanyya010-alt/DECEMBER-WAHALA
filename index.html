@@ -92,52 +92,81 @@
     </div>
   </section>
 
-  <!-- GAME -->
-  <section id="screen-game" class="screen sky">
-    <header class="floatbar game-bar">
-      <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span class="brand-text">December Wahala</span></div>
-      <div class="when"><b id="g-date"></b><div class="slots" id="g-slots"></div></div>
-      <div class="live" id="g-live" hidden><span class="dot"></span><b id="g-online">–</b> online</div>
-      <div class="money"><div><small>Naira</small><b id="g-naira"></b></div><div><small>Dollars</small><b id="g-usd"></b></div><div class="hide-sm"><small>$1 =</small><b id="g-fx"></b></div></div>
-      <button class="iconbtn" id="g-menu" aria-label="Menu">☰</button>
-    </header>
-    <div class="ticker" id="g-ticker"><div class="ticker-track"></div></div>
-    <main class="game-grid">
-      <div class="card map-card">
-        <div class="map-scroll" id="g-map"></div>
-        <div class="map-tools">
-          <span class="muted-sm">Travel by</span>
-          <div class="seg small" id="g-transport"></div>
-          <span class="countdown" id="g-countdown"></span>
+  <!-- GAME: the city -->
+  <section id="screen-game" class="screen game">
+    <div class="world" id="world"></div>
+
+    <div class="hud" id="hud">
+      <header class="hud-top">
+        <div class="hud-clock"><span id="h-sun">☀️</span><b id="h-time"></b></div>
+        <div class="speed" id="h-speed" role="group" aria-label="Game speed">
+          <button data-speed="0" aria-label="Pause">❚❚</button><button data-speed="1" aria-label="Normal speed">▶</button><button data-speed="2" aria-label="Fast">▶▶</button><button data-speed="3" aria-label="Fastest">▶▶▶</button>
         </div>
+        <div class="hud-mood" id="h-mood"></div>
+        <div class="live" id="h-live" hidden><span class="dot"></span><b id="h-online">–</b> online</div>
+        <div class="hud-money"><b id="h-naira"></b><span id="h-usd"></span></div>
+        <button class="iconbtn sm" id="h-menu" aria-label="Menu">☰</button>
+      </header>
+
+      <div class="hud-ticker ticker" id="h-ticker"><div class="ticker-track"></div></div>
+
+      <aside class="hud-quests" id="h-quests"></aside>
+      <button class="clean-btn" id="h-clean">⌃ Clean screen</button>
+
+      <button class="hud-phone-btn" id="h-phone-btn" aria-label="Phone">📱<span class="badge" id="h-unread" hidden></span></button>
+
+      <div class="hud-me" id="h-me">
+        <button class="hud-face" id="h-face" aria-label="Your character"></button>
+        <div class="hud-needs" id="h-needs"></div>
+        <button class="btn primary sm hud-ability" id="h-ability"></button>
       </div>
-      <aside class="card side">
-        <div class="tabs2" role="tablist" id="g-tabs">
-          <button data-tab="here" class="sel">Here</button>
-          <button data-tab="me">Me</button>
-          <button data-tab="wardrobe">Wardrobe</button>
-          <button data-tab="diary">Diary</button>
-        </div>
-        <div class="tab-body" id="tab-here"></div>
-        <div class="tab-body" id="tab-me" hidden></div>
-        <div class="tab-body" id="tab-wardrobe" hidden></div>
-        <div class="tab-body" id="tab-diary" hidden></div>
+
+      <div class="hud-next" id="h-next"></div>
+
+      <nav class="hud-nav" id="h-nav">
+        <button data-panel="me"><span>👤</span>Me</button>
+        <button data-panel="bag"><span>👜</span>Bag</button>
+        <button data-panel="map"><span>🗺️</span>Map</button>
+        <button data-panel="phone"><span>📱</span>Phone<i class="badge" id="h-unread2" hidden></i></button>
+      </nav>
+
+      <div class="activity" id="h-activity" hidden>
+        <span id="act-icon"></span><div class="act-body"><b id="act-label"></b><div class="act-bar"><i id="act-fill"></i></div><small id="act-left"></small></div>
+        <button class="btn sm" id="act-stop">Stop</button>
+      </div>
+
+      <div class="joystick" id="h-joy" hidden><div class="joy-knob"></div></div>
+      <button class="interact-btn" id="h-interact" hidden aria-label="Interact">✋</button>
+
+      <aside class="sheet card" id="sheet" hidden>
+        <div class="sheet-head"><h3 id="sheet-title"></h3><button class="iconbtn sm" id="sheet-close" aria-label="Close">✕</button></div>
+        <div class="sheet-body" id="sheet-body"></div>
       </aside>
-    </main>
+
+      <div class="dialog card" id="dialog" hidden>
+        <div class="dlg-who"><div class="dlg-face" id="dlg-face"></div><div><b id="dlg-name"></b><small id="dlg-rel"></small></div></div>
+        <p class="dlg-text" id="dlg-text"></p>
+        <div class="dlg-opts" id="dlg-opts"></div>
+      </div>
+    </div>
   </section>
 
-  <!-- ENDING -->
+  <!-- ENDING: December biography -->
   <section id="screen-end" class="screen sky">
     <div class="end-wrap card">
       <p class="eyebrow">1st January <span id="e-year"></span></p>
-      <h1 id="e-title"></h1>
+      <h1 id="e-name"></h1>
+      <p class="end-ident" id="e-ident"></p>
+      <h2 id="e-title"></h2>
       <p class="end-scene" id="e-scene"></p>
-      <p id="e-blurb"></p>
+      <div class="bio" id="e-bio"></div>
+      <p class="verdict" id="e-verdict"></p>
+      <div class="end-actions"><button class="btn" id="e-copy">Copy my December</button></div>
       <div class="score">Final score<b id="e-score"></b></div>
       <div class="end-grid" id="e-parts"></div>
       <h3>Who were they really?</h3>
       <div class="truths" id="e-truths"></div>
-      <h3>Badges</h3>
+      <h3>Achievements</h3>
       <div class="badges" id="e-badges"></div>
       <h3>Memories</h3>
       <ul class="memories" id="e-mem"></ul>
@@ -177,14 +206,15 @@
     <div class="card modal-card prose">
       <h3>How to play</h3>
       <ul>
-        <li>December has 31 days with four time slots each. Most things take one slot.</li>
-        <li>Tap a place on the map to travel there. Lagos traffic is wicked. Trekking is free but slow.</li>
-        <li>Keep ⚡ Energy, 🍛 Belle and 🔥 Vibes up. Build 📱 Clout, 🤝🏾 Reputation and 🔗 Connections.</li>
-        <li>Your persona has a superpower, a weakness and a <b>secret</b>. If your secret meter fills, you're exposed.</li>
-        <li>Everyone else has secrets too — the characters in town and the real players. Gist, investigate, then expose them or keep their secret.</li>
-        <li>Your fit matters. Each style "eats" in certain places. Change outfits at home.</li>
-        <li>Family land from abroad on set days. Pick them up at the airport.</li>
-        <li>Reach crossover night on the 31st. Hit your December goal for a big bonus.</li>
+        <li><b>Move</b> with WASD or the arrow keys (hold Shift to run). On a phone, use the joystick.</li>
+        <li><b>E</b> (or ✋) goes inside places and starts conversations. Walk up to people — everyone in the city is somebody.</li>
+        <li><b>Time</b> runs like a real day: 1 second is 1 game minute. Use ⏸ ▶ ▶▶ ▶▶▶ to pause or speed up. Activities fast-forward while they happen.</li>
+        <li>Places keep <b>opening hours</b>. Clubs open at 10pm, banks close at 4pm, owambes happen on Saturdays.</li>
+        <li><b>Map</b> lets you walk there automatically or take a danfo, keke, okada or Bolt. Traffic can turn 12 minutes into 35.</li>
+        <li>Keep ⚡ Energy, 🍛 Belle and 🔥 Vibes up. Build 📱 Clout, 🤝🏾 Reputation and 🔗 Connections — reputation and clout are not the same thing.</li>
+        <li>Everybody has a <b>secret</b>, including you. Dig into people's stories, then keep, trade, expose or use what you learn. People remember what you did.</li>
+        <li>Your <b>phone</b> brings invitations, family requests, brand deals and drama. Say yes, then actually show up.</li>
+        <li>Make it to <b>crossover night</b> on the 31st. Be at a church, club, rooftop, beach or home before midnight.</li>
       </ul>
       <button class="btn primary" data-close>Oya, I don hear</button>
     </div>
@@ -206,10 +236,12 @@
 
   <script src="js/vendor/three.min.js"></script>
   <script src="js/data.js"></script>
+  <script src="js/world-data.js"></script>
+  <script src="js/nav.js"></script>
+  <script src="js/sim.js"></script>
   <script src="js/avatar.js"></script>
   <script src="js/avatar3d.js"></script>
-  <script src="js/map.js"></script>
-  <script src="js/engine.js"></script>
-  <script src="js/ui.js"></script>
+  <script src="js/world3d.js"></script>
+  <script src="js/app.js"></script>
 </body>
 </html>

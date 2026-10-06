@@ -57,14 +57,15 @@ const FABRICS = { plain: "Plain", ankara: "Ankara", adire: "Adire", asooke: "Aso
 
 // Where each look "eats". Matching your fit to the place gives a bonus.
 const STYLES = {
-  streetwear: { name: "Luxury streetwear", icon: "🧢", blurb: "Oversized shirt, baggy jeans, designer sneakers, statement shades.", shines: ["venue", "mall", "hustle"], price: 120000 },
-  afrochic: { name: "Afro-chic", icon: "🌺", blurb: "Ankara and Adire with modern cuts — corsets, skirts, trousers.", shines: ["culture", "mall", "hall"], price: 70000 },
-  glam: { name: "Party glam", icon: "✨", blurb: "Bodycon, minis, sequins, metallics, feathers.", shines: ["lounge", "venue"], price: 150000 },
-  oldmoney: { name: "Old money", icon: "🥂", blurb: "Tailored, neutral, clean. Loafers and quiet luxury.", shines: ["lounge", "church", "airport"], price: 180000 },
-  y2k: { name: "Y2K", icon: "🦋", blurb: "Low-rise, crop tops, tiny bags, denim on denim.", shines: ["venue", "beach", "mall"], price: 60000 },
-  allblack: { name: "All-black", icon: "🖤", blurb: "Black on black. Leather, boots, dark shades, silver.", shines: ["lounge", "venue"], price: 90000 },
-  resort: { name: "Resort", icon: "🌴", blurb: "Linen sets, flowy pieces, crochet, colourful shirts.", shines: ["beach", "culture", "buka"], price: 65000 },
-  tradfusion: { name: "Trad fusion", icon: "👑", blurb: "Agbada, kaftan, aso-ebi and gele — styled for now.", shines: ["hall", "church", "culture"], price: 80000 },
+  streetwear: { name: "Luxury streetwear", icon: "🧢", blurb: "Oversized shirt, baggy jeans, designer sneakers, statement shades.", shines: ["concert", "mall", "hustle", "suya"], price: 120000 },
+  afrochic: { name: "Afro-chic", icon: "🌺", blurb: "Ankara and Adire with modern cuts — corsets, skirts, trousers.", shines: ["photo", "mall", "hall", "cafe"], price: 70000 },
+  glam: { name: "Party glam", icon: "✨", blurb: "Bodycon, minis, sequins, metallics, feathers.", shines: ["lounge", "concert", "club"], price: 150000 },
+  oldmoney: { name: "Old money", icon: "🥂", blurb: "Tailored, neutral, clean. Loafers and quiet luxury.", shines: ["lounge", "church", "restaurant", "hotel"], price: 180000 },
+  y2k: { name: "Y2K", icon: "🦋", blurb: "Low-rise, crop tops, tiny bags, denim on denim.", shines: ["concert", "beach", "mall", "fastfood"], price: 60000 },
+  allblack: { name: "All-black", icon: "🖤", blurb: "Black on black. Leather, boots, dark shades, silver.", shines: ["club", "lounge", "concert"], price: 90000 },
+  resort: { name: "Resort", icon: "🌴", blurb: "Linen sets, flowy pieces, crochet, colourful shirts.", shines: ["beach", "photo", "suya"], price: 65000 },
+  tradfusion: { name: "Trad fusion", icon: "👑", blurb: "Agbada, kaftan, aso-ebi and gele — styled for now.", shines: ["hall", "church", "family"], price: 80000 },
+  christmas: { name: "Christmas fit", icon: "🎄", blurb: "Red, white and festive. Matching-family-pyjamas energy.", shines: ["family", "church", "mall"], price: 55000 },
 };
 
 // ---------------------------------------------------------------- TRAITS

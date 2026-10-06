@@ -1,7 +1,7 @@
 const db = require("./_lib/db");
 const { route, send, HttpError } = require("./_lib/http");
 const { requireUser } = require("./_lib/auth");
-const { NEWS, validState, publicPersona, publicLook } = require("./_lib/game");
+const { NEWS, validState, publicPersona, publicLook, dayOf } = require("./_lib/game");
 
 module.exports = route({
   async PUT({ req, res, body }) {
@@ -13,7 +13,7 @@ module.exports = route({
     const sql = db();
     await sql`
       INSERT INTO saves (user_id, state, city, area, place, day, look, public_persona, persona, clout, exposed, updated_at)
-      VALUES (${user.id}, ${JSON.stringify(st)}, ${st.city}, ${st.area}, ${st.place}, ${st.day}, ${JSON.stringify(publicLook(st.look))},
+      VALUES (${user.id}, ${JSON.stringify(st)}, ${st.city}, ${st.area}, ${st.place || ""}, ${dayOf(st)}, ${JSON.stringify(publicLook(st.look))},
               ${publicPersona(st.persona)}, ${st.persona}, ${Math.round(st.clout) || 0}, ${!!st.exposed}, now())
       ON CONFLICT (user_id) DO UPDATE SET state = EXCLUDED.state, city = EXCLUDED.city, area = EXCLUDED.area,
         place = EXCLUDED.place, day = EXCLUDED.day, look = EXCLUDED.look, public_persona = EXCLUDED.public_persona,

@@ -6,26 +6,29 @@ A shared-city life sim set in **Lagos** and **Abuja** during Detty December. Cre
 
 ## How it plays
 
-1. **Create your Sim** in a 3D drag-to-spin creator: body, 9 women's and 7 men's hairstyles, hair colour, skin tone, 8 Detty December outfit styles (luxury streetwear, Afro-chic, party glam, old money, Y2K, all-black, resort, trad fusion), fabric (Ankara, Adire, Aso-oke, sequin), colours, shades, chain, gele or fila, beard.
-2. **Pick 2 traits** (Owambe Spirit, Smooth Talker, Amebo, Hustle Brain, Prayer Warrior…) and a **December goal** (Detty Legend, Go Viral, Love by Crossover, Who Are You Really?…).
-3. **"Who You Be?"** — your traits and goal decide your persona. Each has a unique resource, a superpower, a weakness and a **secret**:
+**An explorable city.** Lagos (mainland, lagoon, bridges, the Island, the beach) or Abuja (Ring Road park, Jabi Lake, Aso Rock) in low-poly 3D. Walk with **WASD / arrow keys** (Shift to run) or the on-screen joystick on phones. Press **E** (or ✋) to go inside places and talk to people. The camera follows you; buildings, stalls, water and trees block your way; cars stop for you.
 
-| Persona | Resource | Superpower | Weakness | Secret |
-| --- | --- | --- | --- | --- |
-| 🧳 Real IJGB | Dollars | Abroad Price / Dollar Rain | Vendors charge 25% more; family demands | Dollars are mostly credit card |
-| 🎭 Wannabe IJGB | Authenticity | Fake It (free clout) | Questions can blow your cover | Never left Nigeria |
-| ✈️ Japa Returnee | Japa Knowledge | I Know The Process | "How do I come?" | Struggling abroad |
-| 👶🏾 First-Timer Diaspora | Culture Points | Auntie Adoption | Culture shock | Doesn't get half the culture |
-| 💪🏾 Local Hustler | Hustle | I Know A Guy (half price) | Burnout | A life-changing opportunity |
-| 📱 Soft-Life Influencer | Engagement | Post It | Engagement drops if you stop | Almost broke |
-| 👑 Chief's Pikin | Family Influence | Daddy Will Handle It | Black tax | The money isn't theirs |
-| 💃🏾 Owambe Aunty/Uncle | Gossip | Everybody Knows Me | FOMO | Knows everyone's secrets |
+**Real time.** One real second is one game minute at normal speed (⏸ ▶ ▶▶ ▶▶▶, or Space and 1–3). A game day is about 24 real minutes. Activities like eating, partying and sleeping fast-forward while they run, and so do rides.
 
-4. **Where you stay** — Yaba, Surulere, Lekki, Ikoyi, Ajah, or Gwarinpa, Wuse 2, Maitama, Asokoro, Kubwa. Each changes traffic, travel costs and clout.
-5. **Live December** on the city map: travel by trek, danfo, okada or Bolt; 12 places per city; 4 time slots a day; Saturday owambes; diaspora arrivals; village trip; Christmas; Detty Fest concerts; crossover night.
-6. **Secrets and people** — gist with people, investigate their stories, then **expose** them (clout now, trust later) or **keep their secret** (loyalty pays). This works with the characters in town *and* with real players. If your own secret meter fills up, you get exposed.
+**25 places with opening hours**: your flat (with a walk-in 3D interior: bed, stove, TV, desk, mirror), family house, hotel, Mama T's Kitchen, Chop Republic, Island Grill, Bean & Breeze Café, the suya spot, Club Eko, the rooftop lounge, the concert grounds, the owambe hall, the beach, the Detty Wall photo spot, Palms Mall, the fashion house, salon, gym, bank, BDC, office, Computer Village, Tejuosho Market, the bus stop, church — and the airport by ride.
 
-Stats: ⚡ Energy, 🍛 Belle, 🔥 Vibes, 📱 Clout, 🤝🏾 Reputation (different from clout), 🔗 Connections, 💰 Naira + Dollars with a daily exchange rate.
+**People with routines.** Kemi, Dayo, Big Tunde, Mama Nkechi, Seun, Cousin Tobi, Aunty Funke, Chidi, Mama, Mama T, Promoter Biggie, Bouncer Sule and Uncle Taiwo walk the streets on daily schedules (café → photo spot → mall → lounge → club), plus strangers going about their day. Diaspora family land on set days.
+
+**Conversations and memory.** Gist, answer questions ("Guy, you dey go Club Eko tonight?"), give gifts or money, flirt, ask people out, ask for favours. People remember what you did — helped, lied, exposed, ignored, embarrassed, blackmailed — and greet you accordingly.
+
+**Secrets.** Dig into someone's story, then keep it, use it to become friends, tell someone, trade it, expose it, or demand money — and live with the consequences. Four story chains run across the month (*The Range Rover*, *Which Tube Stop?*, *Cousin From London*, *Card Declined*).
+
+**Eight personas** (Real IJGB, Wannabe IJGB, Japa Returnee, First-Timer Diaspora, Local Hustler, Soft-Life Influencer, Chief's Pikin, Owambe Aunty/Uncle), each with a resource, an ability, a weakness, a secret and a mission — and the world treats each one differently.
+
+**Getting around.** Walk (auto-walk from the map), danfo (from the bus stop), keke, okada (banned on the bridge) or Bolt (surge pricing). Traffic depends on time of day, concert days and peak December: "12 min → 35 min".
+
+**Phone.** WhatsApp (invitations, family requests, brand deals, gossip, dates), Gram (post and read the comments), Bank, Ride, Calendar and Missions. Say yes to a plan and you're expected to show up.
+
+**Fashion.** Nine styles from luxury streetwear to aso-ebi, plus shoes, bags and jewellery you can see on your character. Fits "eat" at matching places; the bouncer turns away slippers.
+
+**December.** Warm-up → Diaspora arrivals → Getting serious → Peak December → Christmas → Post-Christmas madness → Crossover. Christmas lights go up mid-month, Saturdays are owambes, the stage lights up on concert nights, and fireworks go off on the 31st.
+
+**The ending** is your December biography: money in and out, parties, relationships, friends, secrets, wahalas survived, your December reputation (Everybody's Padi, Professional Amebo, Biggest Fraud of December…), a verdict, achievements and memories — with a button to copy it for sharing.
 
 ## Online
 
@@ -40,12 +43,14 @@ Stats: ⚡ Energy, 🍛 Belle, 🔥 Vibes, 📱 Clout, 🤝🏾 Reputation (diff
 | Path | Purpose |
 | --- | --- |
 | `index.html`, `css/style.css` | Page and styles |
-| `js/data.js` | Personas, traits, goals, styles, places, people, actions, events |
-| `js/engine.js` | Game rules (DOM-free; runs in Node for tests) |
-| `js/avatar3d.js` | Low-poly 3D characters (three.js r128, vendored in `js/vendor/`) |
-| `js/avatar.js` | Flat SVG characters for map pins and lists |
-| `js/map.js` | Lagos and Abuja city maps |
-| `js/ui.js` | Screens, accounts, shared city |
+| `js/data.js` | Personas, traits, goals, looks and styles, random events |
+| `js/world-data.js` | Street grid, places and hours, actions, items, people and schedules, questions, story chains, missions, identities, achievements |
+| `js/nav.js` | Road graph and A* paths |
+| `js/sim.js` | The real-time game engine (DOM-free; runs in Node for tests) |
+| `js/world3d.js` | The 3D city, movement, collisions, camera, people, day/night, home interior |
+| `js/avatar3d.js` | Rigged low-poly 3D characters (three.js r128, vendored in `js/vendor/`) |
+| `js/avatar.js` | Flat SVG characters for portraits and lists |
+| `js/app.js` | Landing, accounts, creator, HUD, panels, phone, ending |
 | `api/*.js` | Vercel serverless API (signup, login, logout, me, save, city, interact, inbox) |
 | `db/schema.sql` | Postgres schema (Neon) |
 
@@ -53,7 +58,7 @@ Stats: ⚡ Energy, 🍛 Belle, 🔥 Vibes, 📱 Clout, 🤝🏾 Reputation (diff
 
 ```sh
 npm install
-npm test                    # 480 simulated Decembers + API tests on in-memory Postgres
+npm test                    # simulated Decembers + API tests on in-memory Postgres
 node test/dev-server.js     # http://localhost:3000 with an in-memory database
 ```
 

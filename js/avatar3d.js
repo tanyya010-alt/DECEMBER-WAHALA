@@ -58,8 +58,12 @@
   }
   function sphere(r, mat, ws = 9, hs = 7) { return new THREE.Mesh(new THREE.SphereGeometry(r, ws, hs), mat); }
 
-  function build(look) {
+  // opts.lite skips small face details (used for crowds).
+  function build(look, opts = {}) {
     const root = new THREE.Group();
+    const pivot = (x, y, z) => { const g = new THREE.Group(); g.position.set(x, y, z); root.add(g); return g; };
+    const into = (g, m) => { m.position.sub(g.position); g.add(m); return m; };
+    const legs = [], arms = [];
     const w = look.body === "woman";
     const fit = window.Avatar.outfitFor(look);
     const skinC = hex(D.SKIN[look.skin] || D.SKIN[3]);
@@ -78,22 +82,26 @@
     // ---- legs and feet
     const pants = ["baggy", "trousers", "lowrise"].includes(fit.bottom);
     const legR = fit.bottom === "baggy" || fit.bottom === "lowrise" ? 0.078 : pants ? 0.066 : 0.058;
+    const shoeType = look.shoes || fit.shoes;
     [-1, 1].forEach((sd) => {
       const x = sd * 0.085;
-      add(limb([x, 0.86, 0], [x * 1.05, 0.46, 0], legR, pants || fit.bottom === "shorts" ? bottom : skin));
-      add(limb([x * 1.05, 0.46, 0], [x * 1.1, 0.07, 0.01], pants ? legR * 0.85 : 0.048, pants ? bottom : skin));
-      add(sphere(pants ? legR * 0.85 : 0.048, pants ? bottom : skin, 7, 5)).position.set(x * 1.05, 0.46, 0);
+      const g = pivot(x, 0.86, 0);
+      legs.push(g);
+      into(g, limb([x, 0.86, 0], [x * 1.05, 0.46, 0], legR, pants || fit.bottom === "shorts" ? bottom : skin));
+      into(g, limb([x * 1.05, 0.46, 0], [x * 1.1, 0.07, 0.01], pants ? legR * 0.85 : 0.048, pants ? bottom : skin));
+      const knee = sphere(pants ? legR * 0.85 : 0.048, pants ? bottom : skin, 7, 5);
+      knee.position.set(x * 1.05, 0.46, 0);
+      into(g, knee);
       let shoe;
-      if (fit.shoes === "boots") {
-        shoe = limb([x * 1.1, 0.42, 0.01], [x * 1.1, 0.04, 0.02], 0.06, dark);
-        add(shoe);
+      if (shoeType === "boots") {
+        into(g, limb([x * 1.1, 0.42, 0.01], [x * 1.1, 0.04, 0.02], 0.06, dark));
         shoe = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.07, 0.2), dark);
       } else {
-        const col = { sneakers: 0xf4f4f2, heels: baseC, loafers: 0x5a3a22, sandals: 0x8a5a32 }[fit.shoes] || 0x333333;
-        shoe = new THREE.Mesh(new THREE.BoxGeometry(0.09, fit.shoes === "sneakers" ? 0.08 : 0.05, 0.2), lambert(col));
+        const col = { sneakers: 0xf4f4f2, heels: baseC, loafers: 0x5a3a22, sandals: 0x8a5a32, slippers: 0x2b4c9b }[shoeType] || 0x333333;
+        shoe = new THREE.Mesh(new THREE.BoxGeometry(0.09, shoeType === "sneakers" ? 0.08 : shoeType === "slippers" ? 0.025 : 0.05, 0.2), lambert(col));
       }
-      shoe.position.set(x * 1.1, 0.035, 0.05);
-      add(shoe);
+      shoe.position.set(x * 1.1, shoeType === "slippers" ? 0.015 : 0.035, 0.05);
+      into(g, shoe);
     });
 
     // ---- hips and torso
@@ -140,10 +148,17 @@
         add(sphere(0.042, skin)).position.set(sd * 0.36, 0.84, 0.06);
         return;
       }
-      add(limb(sh, el, sleeve ? (fit.top === "tee" ? 0.07 : 0.058) : 0.048, sleeve ? main : skin));
-      add(sphere(sleeve === "full" ? 0.05 : 0.041, sleeve === "full" ? main : skin, 7, 5)).position.set(...el);
-      add(limb(el, wr, sleeve === "full" ? 0.052 : 0.042, sleeve === "full" ? main : skin));
-      add(sphere(0.042, skin)).position.set(wr[0], wr[1] - 0.04, wr[2]);
+      const g = pivot(...sh);
+      arms.push(g);
+      into(g, limb(sh, el, sleeve ? (fit.top === "tee" ? 0.07 : 0.058) : 0.048, sleeve ? main : skin));
+      const elbow = sphere(sleeve === "full" ? 0.05 : 0.041, sleeve === "full" ? main : skin, 7, 5);
+      elbow.position.set(...el);
+      into(g, elbow);
+      into(g, limb(el, wr, sleeve === "full" ? 0.052 : 0.042, sleeve === "full" ? main : skin));
+      const hand = sphere(0.042, skin);
+      hand.position.set(wr[0], wr[1] - 0.04, wr[2]);
+      into(g, hand);
+      if (look.watch && sd < 0) { const wt = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.03, 0.06), gold); wt.position.set(wr[0], wr[1] + 0.02, wr[2]); into(g, wt); }
       if (["corset", "minidress", "midi", "crop", "gown"].includes(fit.top)) {
         add(limb([sd * 0.08, 1.46, 0.03], [sd * 0.09, 1.33, 0.08], 0.008, main));
       }
@@ -154,7 +169,7 @@
     const head = add(sphere(0.115, skin, 12, 10));
     head.position.set(0, 1.64, 0);
     head.scale.set(0.95, 1.12, 1);
-    [-1, 1].forEach((sd) => {
+    if (!opts.lite) [-1, 1].forEach((sd) => {
       add(sphere(0.024, skin, 6, 5)).position.set(sd * 0.11, 1.64, 0);
       add(sphere(0.013, dark, 6, 5)).position.set(sd * 0.042, 1.655, 0.1);
       const brow = add(new THREE.Mesh(new THREE.BoxGeometry(0.036, 0.008, 0.01), lambert(0x1a1210)));
@@ -277,6 +292,15 @@
       const ch = add(new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.007, 4, 18), gold));
       ch.position.set(0, 1.39, 0.06); ch.rotation.x = Math.PI / 2.3; ch.scale.set(1, 1.3, 1);
     }
+    if (look.bag) {
+      const big = look.bag === "designer_bag";
+      const bag = add(new THREE.Mesh(new THREE.BoxGeometry(big ? 0.2 : 0.12, big ? 0.16 : 0.09, 0.07), lambert(big ? 0x8a5a32 : 0xec4899)));
+      bag.position.set(w ? 0.27 : 0.3, big ? 0.98 : 1.02, 0.02);
+      add(limb([0.17, 1.4, 0.0], [w ? 0.27 : 0.3, big ? 1.06 : 1.06, 0.02], 0.006, dark));
+    }
+    const wide = look.build === "slim" ? 0.92 : look.build === "curvy" ? 1.1 : 1;
+    root.scale.set(wide, 1, wide);
+    root.userData.limbs = { legs, arms };
     return root;
   }
 

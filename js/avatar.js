@@ -45,6 +45,7 @@
       allblack: w ? { top: "minidress", bottom: null, shoes: "boots", forceColour: "#17181d" } : { top: "shirt", bottom: "trousers", bottomFill: "#101114", shoes: "boots", forceColour: "#17181d" },
       resort: w ? { top: "shirt", bottom: "shorts", bottomFill: "main", shoes: "sandals" } : { top: "shirt", bottom: "shorts", bottomFill: "#e7dcc6", shoes: "sandals" },
       tradfusion: w ? { top: "gown", bottom: null, shoes: "heels" } : { top: "agbada", bottom: "trousers", bottomFill: "main", shoes: "loafers" },
+      christmas: w ? { top: "minidress", bottom: null, shoes: "boots", forceColour: "#c62828" } : { top: "tee", bottom: "trousers", bottomFill: "#f3ede0", shoes: "sneakers", forceColour: "#c62828" },
     };
     return map[s] || map.streetwear;
   }

@@ -5,7 +5,7 @@ const http = require("http");
 const path = require("path");
 const { newDb } = require("pg-mem");
 const D = require("../js/data.js");
-const { Game } = require("../js/engine.js");
+const { Sim } = require("../js/sim.js");
 
 (async () => {
   const mem = newDb();
@@ -43,7 +43,7 @@ const { Game } = require("../js/engine.js");
   }
   const a = agent(), b = agent(), anon = agent();
   const look = { body: "woman", skin: 2, hair: "bob", hairColour: "black", style: "glam", colour: 1, fabric: "sequin" };
-  const newState = (persona, name) => Game.create({ name, look, traits: ["smooth", "gossip"], goal: "viral", persona, city: "lagos", area: "yaba" }, 1).s;
+  const newState = (persona, name) => Sim.create({ name, look, traits: ["smooth", "gossip"], goal: "viral", persona, city: "lagos", area: "yaba" }, 1).s;
 
   let r = await a("POST", "signup", { name: "Ada", username: "ada_eko", password: "secret1", adult: true });
   assert.strictEqual(r.status, 201, JSON.stringify(r.body));
@@ -71,6 +71,10 @@ const { Game } = require("../js/engine.js");
   assert.strictEqual(r.status, 200);
   r = await b("PUT", "save", { state: { ...newState("wannabe", "Dayo"), city: "paris" } });
   assert.strictEqual(r.status, 400);
+  r = await b("PUT", "save", { state: { ...newState("wannabe", "Dayo"), version: 2 } });
+  assert.strictEqual(r.status, 400);
+  r = await b("PUT", "save", { state: { ...newState("wannabe", "Dayo"), place: null } });
+  assert.strictEqual(r.status, 200);
   r = await anon("PUT", "save", { state: newState("ijgb", "Nobody") });
   assert.strictEqual(r.status, 401);
 
