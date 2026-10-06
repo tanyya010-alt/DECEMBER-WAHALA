@@ -511,6 +511,9 @@ button { font: inherit; color: inherit; }
   .slots span { padding: 2px 5px; }
   .create-scroll { padding: 18px 16px 8px; }
 }
+@media (max-width: 1440px) and (min-width: 901px) {
+  .hud-quests { top: calc(env(safe-area-inset-top, 0px) + 112px); width: min(320px, calc(100vw - 32px)); }
+}
 @media (max-width: 900px) {
   .hud-top { gap: 8px; padding: 6px 8px 6px 14px; font-size: .85rem; }
   .hud-mood b, .hud-top .live { display: none; }
