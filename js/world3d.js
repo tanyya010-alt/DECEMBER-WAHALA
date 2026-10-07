@@ -737,7 +737,12 @@
       const t = -ray.origin.y / ray.direction.y;
       if (t < 0) return null;
       const x = ray.origin.x + ray.direction.x * t, z = ray.origin.z + ray.direction.z * t;
-      if (this.interior && this.room && (Math.abs(x) > this.room.w / 2 || Math.abs(z - ROOM_Z) > this.room.d / 2 + 0.6)) return null;
+      if (this.interior && this.room) {
+        if (Math.abs(x) > this.room.w / 2 + 1 || Math.abs(z - ROOM_Z) > this.room.d / 2 + 1.5) return null;
+        // Keep taps inside the room's walls.
+        const hw = this.room.w / 2 - 0.6, hd = this.room.d / 2 - 0.6;
+        return { kind: "ground", x: Math.max(-hw, Math.min(hw, x)), z: ROOM_Z + Math.max(-hd, Math.min(hd, z - ROOM_Z)) };
+      }
       return { kind: "ground", x, z };
     }
 
@@ -867,7 +872,13 @@
         const p = this.player.position;
         const nx = p.x + mx * sp, nz = p.z + mz * sp;
         const free = (x, z) => !this.blockedAt(x, z);
-        if (this.walk) { p.x = nx; p.z = nz; } // routes are already clear
+        // Overlapping something already? Let any step get you out instead of freezing.
+        const stuck = !free(p.x, p.z);
+        if (this.walk && !stuck && !free(nx, nz)) {
+          // A route that would clip a wall stops here (close enough to use the thing).
+          const wk = this.walk; this.walk = null; this.marker.visible = false;
+          if (wk.onArrive) wk.onArrive();
+        } else if (this.walk || stuck) { p.x = nx; p.z = nz; }
         else { if (free(nx, p.z)) p.x = nx; if (free(p.x, nz)) p.z = nz; }
         const want = Math.atan2(mx, mz);
         let d = want - this.player.rotation.y;

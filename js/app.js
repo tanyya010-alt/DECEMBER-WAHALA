@@ -600,7 +600,13 @@
     if (!pie) return;
     const b = e.target.closest("[data-pi], [data-pie]");
     if (!b) return;
-    if (b.dataset.pie === "close") { closePie(); return; }
+    if (b.dataset.pie === "close") {
+      // Clicking away closes the menu and does what you clicked on (walk there, open another menu).
+      closePie();
+      const w = app.world;
+      if (w) { const pick = w.pickAt(e.clientX, e.clientY); if (pick) onPick(pick, e.clientX, e.clientY); }
+      return;
+    }
     const list = pie.cat ? [{ back: true }, ...pie.items.find((i) => i.cat === pie.cat).sub] : pie.items;
     const it = list[Number(b.dataset.pi)];
     if (!it) return;
@@ -1158,6 +1164,7 @@
     if (e.key === "Escape") { closeModals(); if (app.pie) closePie(); else if (app.panel) { closeSheet(); renderHud(true); } }
     if (!app.sim || !document.getElementById("screen-game").classList.contains("active") || /INPUT|TEXTAREA/.test(e.target.tagName)) return;
     const k = e.key.toLowerCase();
+    if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(k) && app.pie) closePie();
     if (k === "m") { app.panel === "map" ? closeSheet() : openPanel("map"); }
     if (k === "p") { app.panel === "phone" ? closeSheet() : openPanel("phone"); }
     if (k === "b" || k === "i") { app.panel === "bag" ? closeSheet() : openPanel("bag"); }
@@ -1306,6 +1313,8 @@
   $("sheet-body").addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && e.target.dataset.place) { e.preventDefault(); app.mapSel = e.target.dataset.place; refreshPanel(); } });
 
   $("pie").addEventListener("click", pieClick);
+  // Scrolling over an open menu closes it and zooms the camera as usual.
+  $("pie").addEventListener("wheel", (e) => { if (e.target.closest(".pie-item")) return; closePie(); if (app.world) app.world.zoom = Math.max(0.5, Math.min(1.7, app.world.zoom * (e.deltaY > 0 ? 1.08 : 0.93))); }, { passive: true });
   $("h-queue").addEventListener("click", (e) => {
     const b = e.target.closest("[data-q]");
     if (!b || !app.sim) return;
@@ -1334,6 +1343,7 @@
       if (m > max) { x = (x / m) * max; y = (y / m) * max; }
       knob.style.transform = `translate(${x}px, ${y}px)`;
       if (app.world) app.world.setJoystick(x / max, y / max);
+      if (app.pie && (Math.abs(x) > 8 || Math.abs(y) > 8)) closePie();
     };
     el.addEventListener("pointerdown", (e) => { id = e.pointerId; el.setPointerCapture(id); move(e); });
     el.addEventListener("pointermove", (e) => { if (e.pointerId === id) move(e); });

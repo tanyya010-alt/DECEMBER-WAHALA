@@ -496,9 +496,6 @@ button { font: inherit; color: inherit; }
   .floatbar { border-radius: 26px; flex-wrap: wrap; gap: 8px 14px; padding: 10px 14px; }
   .floatbar-actions { margin-left: auto; }
   .ticker { top: calc(env(safe-area-inset-top, 0px) + 128px); }
-  /* In the game, the bars scroll with the page on small screens. */
-  #screen-game { padding-top: calc(env(safe-area-inset-top, 0px) + 12px); }
-  #screen-game .floatbar, #screen-game .ticker { position: relative; top: 0; left: 0; transform: none; width: auto; margin: 0 16px 12px; }
   .brand-text { display: none; }
 }
 @media (max-width: 560px) {
@@ -786,7 +783,11 @@ kbd { display: inline-block; min-width: 24px; padding: 2px 7px; margin: 0 2px 2p
   .hud-music { width: 32px; height: 32px; }
   .hud-money .plus { display: none; }
   .hud-money b { font-size: .8rem; }
-  .hud-top { gap: 4px; padding-left: 10px; }
+  .hud-top { gap: 3px; padding-left: 10px; overflow: hidden; }
+  .hud-top #h-sun { display: none; }
+  .hud-clock { min-width: 0; }
+  .hud-clock b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .speed button { padding: 3px 5px; }
   .hud-money { padding: 3px 3px 3px 9px; }
   .hud-top .sep { display: none; }
   .hud-me { top: calc(env(safe-area-inset-top, 0px) + 150px); }
@@ -800,3 +801,8 @@ kbd { display: inline-block; min-width: 24px; padding: 2px 7px; margin: 0 2px 2p
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+/* The game area never drags the page; panels still scroll on touch. */
+#screen-game.active { position: fixed; inset: 0; overflow: hidden; overscroll-behavior: none; }
+.world-canvas { touch-action: none; }
+.sheet-body, .ip-body, .dlg-opts, .modal-card { touch-action: pan-y; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.pie-back { touch-action: none; }
