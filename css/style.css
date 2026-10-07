@@ -4,17 +4,19 @@
   color-scheme: light;
   --sky: #dcebfb;
   --sky-2: #eef5fc;
-  --sky-ink: #2f7de1;
+  --sky-ink: #2f7de1; /* lagoon */
+  --lagoon-soft: #e8f1fd;
+  --sunset: #f59e42;
   --card: #ffffff;
-  --ink: #1b2232;
-  --muted: #667085;
-  --line: #e4eaf2;
-  --chip: #f1f4f9;
-  --mint: #20b46e;
-  --mint-d: #17945a;
+  --ink: #1d2433;
+  --muted: #5b6478;
+  --line: rgba(29, 36, 51, .08);
+  --chip: #f3f5f9;
+  --mint: #22b573;
+  --mint-d: #128a55;
   --mint-soft: #e5f7ee;
   --gold: #f2b632;
-  --coral: #e5484d;
+  --coral: #ef5a6f;
   --coral-soft: #fdecec;
   --land: #cfe7c5;
   --water: #8fd0ee;
@@ -24,20 +26,23 @@
   --block: #e9efe6;
   --rock: #b9c4a8;
   --park: #b5dca5;
-  --display: "Bricolage Grotesque", "Plus Jakarta Sans", system-ui, sans-serif;
+  --display: "Fredoka", "Plus Jakarta Sans", system-ui, sans-serif;
   --body: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --r: 22px;
-  --shadow: 0 10px 30px rgba(27, 34, 50, 0.08), 0 2px 6px rgba(27, 34, 50, 0.05);
+  --radius: 1rem;
+  --top: max(env(safe-area-inset-top, 0px), 10px);
+  --shadow: 0 10px 30px rgba(29, 36, 51, 0.08), 0 2px 6px rgba(29, 36, 51, 0.05);
 }
 
 * { box-sizing: border-box; }
-html, body { margin: 0; }
+html, body { margin: 0; -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; overscroll-behavior: none; }
 body {
   background: var(--sky);
   color: var(--ink);
   font-family: var(--body);
   font-size: 15px;
-  line-height: 1.45;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
   min-height: 100vh;
   overflow-x: hidden;
 }
@@ -806,3 +811,6 @@ kbd { display: inline-block; min-width: 24px; padding: 2px 7px; margin: 0 2px 2p
 .world-canvas { touch-action: none; }
 .sheet-body, .ip-body, .dlg-opts, .modal-card { touch-action: pan-y; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 .pie-back { touch-action: none; }
+/* Fredoka for the playful numbers and titles in the HUD. */
+.hud-clock b, .hud-money b, .pill .qt b, .hud-nav button, .ip-widget b, .emo-box b, .sheet-head h3, .pie-center b { font-family: var(--display); font-weight: 600; letter-spacing: .005em; }
+.hud-top { top: calc(var(--top) + 2px); }

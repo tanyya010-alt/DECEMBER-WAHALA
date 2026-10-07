@@ -53,7 +53,7 @@
     grad.addColorStop(0, "#ff4fa3"); grad.addColorStop(0.5, "#ffb300"); grad.addColorStop(1, "#20b46e");
     g.fillStyle = grad; g.fillRect(0, 0, 512, 256);
     for (let i = 0; i < 40; i++) { g.fillStyle = `hsla(${i * 37},90%,70%,.5)`; g.beginPath(); g.arc(Math.random() * 512, Math.random() * 256, 8 + Math.random() * 22, 0, 7); g.fill(); }
-    g.fillStyle = "#fff"; g.font = "900 64px 'Bricolage Grotesque', system-ui"; g.textAlign = "center";
+    g.fillStyle = "#fff"; g.font = "700 64px 'Fredoka', system-ui"; g.textAlign = "center";
     g.fillText("DETTY", 256, 110); g.fillText("DECEMBER", 256, 180);
     return new THREE.CanvasTexture(c);
   }
