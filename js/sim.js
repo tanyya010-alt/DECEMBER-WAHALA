@@ -1472,6 +1472,49 @@
       this.log(`${so.icon} ${who.name} came over: ${lines[a.sid] || "\"Hey!\""}`, mean ? "bad" : "good");
     }
 
+    // ============================================================ daily gift hunt
+    // Three gift boxes are hidden along the streets each day.
+    huntSpots(day = this.day()) {
+      const G = W.GRID, out = [];
+      for (let i = 0; i < 3; i++) {
+        const inner = G.hRoads.slice(1, -1); // keep away from the city's edge roads
+        const z = inner[Math.floor(hash(day, i, 11) * inner.length)] + (hash(day, i, 12) < 0.5 ? -1.5 : 1.5);
+        const x = Math.round(-56 + hash(day, i, 13) * 112);
+        out.push({ x, z });
+      }
+      return out;
+    }
+    hunt() {
+      const s = this.s, day = this.day();
+      if (!s.hunt || s.hunt.day !== day) s.hunt = { day, found: [false, false, false] };
+      return s.hunt;
+    }
+    huntPrize(n) { return [3000, 6000, 15000][n] || 0; }
+    collectGift(i) {
+      const s = this.s, h = this.hunt();
+      if (s.over || h.found[i] === undefined || h.found[i]) return false;
+      const n = h.found.filter(Boolean).length;
+      h.found[i] = true;
+      const prize = this.huntPrize(n);
+      this.earn(prize, "hunt");
+      this.applyFx({ vibes: 6 });
+      s.stats.gifts = (s.stats.gifts || 0) + 1;
+      this.bubble("me", "🎁", "say");
+      this.log(n === 2 ? `🎁 All three gifts found today! Jackpot: ${naira(prize)}.` : `🎁 You found a hidden gift: ${naira(prize)}! ${2 - n} more out there today.`, "achieve");
+      return true;
+    }
+    // A hot-and-cold hint toward the nearest unfound gift.
+    huntHint() {
+      const s = this.s, h = this.hunt();
+      const p = s.pos || this.places[s.place || "home"].spot;
+      const left = this.huntSpots().map((g, i) => ({ ...g, i })).filter((g) => !h.found[g.i]);
+      if (!left.length) return "You've found all of today's gifts. New ones tomorrow!";
+      left.sort((a, b) => Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z));
+      const g = left[0], dx = g.x - p.x, dz = g.z - p.z, d = Math.hypot(dx, dz);
+      const dir = (Math.abs(dz) > Math.abs(dx) * 0.5 ? (dz < 0 ? "north" : "south") : "") + (Math.abs(dx) > Math.abs(dz) * 0.5 ? (dx > 0 ? "east" : "west") : "");
+      return d < 10 ? "🔥 Very hot! It's right around you." : d < 30 ? `♨️ Warm… about ${Math.round(d)} steps ${dir}.` : `🧊 Cold. Head ${dir}, about ${Math.round(d)} steps.`;
+    }
+
     // Food delivery from the phone (Chowdeck).
     orderFood(item) {
       const s = this.s, prices = { jollof_pack: 4500, chicken_bucket: 12000 };

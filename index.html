@@ -102,16 +102,21 @@
         <div class="speed" id="h-speed" role="group" aria-label="Game speed">
           <button data-speed="0" aria-label="Pause">❚❚</button><button data-speed="1" aria-label="Normal speed">▶</button><button data-speed="2" aria-label="Fast">▶▶</button><button data-speed="3" aria-label="Fastest">▶▶▶</button>
         </div>
+        <span class="sep"></span>
         <div class="hud-mood" id="h-mood"></div>
         <div class="live" id="h-live" hidden><span class="dot"></span><b id="h-online">–</b> online</div>
-        <div class="hud-money"><b id="h-naira"></b><span id="h-usd"></span></div>
+        <button class="hud-music" id="h-music" aria-label="Turn music on" aria-pressed="false" title="Music"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><path class="wave" d="M16 9a5 5 0 0 1 0 6"/><path class="wave" d="M19.364 18.364a9 9 0 0 0 0-12.728"/><path class="mute" d="m22 9-6 6"/><path class="mute" d="m16 9 6 6"/></svg></button>
+        <button class="hud-money" id="h-wallet" aria-label="Wallet"><b id="h-naira"></b><span id="h-usd"></span><i class="plus">+</i></button>
         <button class="iconbtn sm" id="h-menu" aria-label="Menu">☰</button>
       </header>
 
       <div class="hud-ticker ticker" id="h-ticker"><div class="ticker-track"></div></div>
 
-      <aside class="hud-quests" id="h-quests"></aside>
-      <button class="clean-btn" id="h-clean">⌃ Clean screen</button>
+      <div class="hud-left">
+        <aside class="hud-quests" id="h-quests"></aside>
+        <button class="pill hunt-pill" id="h-hunt" aria-label="Daily gift hunt"></button>
+        <button class="pill clean-pill" id="h-clean">⌃ Clean screen</button>
+      </div>
 
       <button class="hud-phone-btn" id="h-phone-btn" aria-label="Phone">📱<span class="badge" id="h-unread" hidden></span></button>
 
@@ -127,14 +132,14 @@
       </div>
 
       <div class="hud-next" id="h-next"></div>
+      <button class="hud-keys" id="h-keys" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 8h.01"/><path d="M12 12h.01"/><path d="M14 8h.01"/><path d="M16 12h.01"/><path d="M18 8h.01"/><path d="M6 8h.01"/><path d="M7 16h10"/><path d="M8 12h.01"/><rect width="20" height="16" x="2" y="4" rx="2"/></svg></button>
 
       <nav class="hud-nav" id="h-nav">
-        <button data-panel="place" id="h-here" hidden><span>📋</span>Here</button>
-        <button data-panel="me"><span>👤</span>Sim</button>
-        <button data-panel="buy" id="h-buy" hidden><span>🛋️</span>Buy</button>
-        <button data-panel="bag"><span>👜</span>Bag</button>
-        <button data-panel="map"><span>🗺️</span>Map</button>
-        <button data-panel="phone"><span>📱</span>Phone<i class="badge" id="h-unread2" hidden></i></button>
+        <button data-panel="" id="h-live-tab"><span><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>Live</button>
+        <button data-panel="place" id="h-here"><span><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg></span>Here</button>
+        <button data-panel="buy" id="h-buy"><span><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v3"/><path d="M2 16a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5a2 2 0 0 0-4 0v1.5a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5V11a2 2 0 0 0-4 0z"/><path d="M4 18v2"/><path d="M20 18v2"/><path d="M12 4v9"/></svg></span>Buy</button>
+        <button data-panel="map"><span><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15"/><path d="M9 3.236v15"/></svg></span>Map</button>
+        <button data-panel="phone"><span><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg><i class="badge" id="h-unread2" hidden></i></span>Phone</button>
       </nav>
 
       <div class="activity" id="h-activity" hidden>
@@ -211,6 +216,28 @@
       <div class="choices"><button class="btn danger" id="btn-restart-yes">Delete and start over</button><button class="btn" data-close>Keep playing</button></div>
     </div>
   </div>
+  <div class="modal" id="m-keys" hidden>
+    <div class="card modal-card prose">
+      <h3>Keyboard shortcuts</h3>
+      <table class="keys">
+        <tr><td><kbd>Click</kbd></td><td>Walk there, or open a person's, object's or building's menu</td></tr>
+        <tr><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></td><td>Walk (hold <kbd>Shift</kbd> to run)</td></tr>
+        <tr><td><kbd>E</kbd></td><td>Menu for whatever is closest</td></tr>
+        <tr><td><kbd>Q</kbd> <kbd>R</kbd></td><td>Turn the camera (or right-drag); scroll to zoom</td></tr>
+        <tr><td><kbd>Space</kbd></td><td>Pause / play</td></tr>
+        <tr><td><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd></td><td>Game speed</td></tr>
+        <tr><td><kbd>M</kbd></td><td>Map</td></tr>
+        <tr><td><kbd>P</kbd></td><td>Phone</td></tr>
+        <tr><td><kbd>B</kbd></td><td>Bag and wardrobe</td></tr>
+        <tr><td><kbd>U</kbd></td><td>Your Sim (needs, skills, people)</td></tr>
+        <tr><td><kbd>H</kbd></td><td>Things to do here</td></tr>
+        <tr><td><kbd>N</kbd></td><td>Music on / off</td></tr>
+        <tr><td><kbd>Esc</kbd></td><td>Close menus and panels</td></tr>
+        <tr><td><kbd>?</kbd></td><td>This list</td></tr>
+      </table>
+      <button class="btn primary" data-close>Got it</button>
+    </div>
+  </div>
   <div class="modal" id="m-help" hidden>
     <div class="card modal-card prose">
       <h3>How to play</h3>
@@ -256,6 +283,7 @@
   <script src="js/avatar.js"></script>
   <script src="js/avatar3d.js"></script>
   <script src="js/gridnav.js"></script>
+  <script src="js/music.js"></script>
   <script src="js/poses.js"></script>
   <script src="js/rooms.js"></script>
   <script src="js/world3d.js"></script>

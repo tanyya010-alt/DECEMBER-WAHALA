@@ -936,6 +936,7 @@
       }
 
       this.updatePeople(realDt);
+      this.updateGifts(realDt);
       this.updateBubbles(realDt);
       this.updateAmbient(realDt);
       this.findTarget();
@@ -1120,6 +1121,39 @@
         rec.model.visible = false;
         if (this.people.size > 80) { this.scene.remove(rec.model); this.people.delete(id); }
       }
+    }
+
+    // Today's hidden gift boxes: walk into one to collect it.
+    updateGifts() {
+      if (!this.gifts) {
+        this.gifts = [0, 1, 2].map((i) => {
+          const g = new THREE.Group();
+          const cols = [0xe5484d, 0x20b46e, 0x8b5cf6][i];
+          const b = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.9, 0.9), new THREE.MeshLambertMaterial({ color: cols, emissive: cols, emissiveIntensity: 0.25 }));
+          const r1 = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.95, 0.2), new THREE.MeshLambertMaterial({ color: 0xffd23b, emissive: 0x6a5000 }));
+          const r2 = r1.clone(); r2.rotation.y = Math.PI / 2;
+          const bow = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.07, 6, 12), r1.material); bow.position.y = 0.55;
+          const glowRing = new THREE.Mesh(new THREE.RingGeometry(0.6, 1.0, 24), new THREE.MeshBasicMaterial({ color: 0xffd23b, transparent: true, opacity: 0.45, side: THREE.DoubleSide }));
+          glowRing.rotation.x = -Math.PI / 2; glowRing.position.y = -1.05;
+          g.add(b, r1, r2, bow, glowRing);
+          g.userData.ring = glowRing;
+          this.scene.add(g);
+          return g;
+        });
+      }
+      const sim = this.sim, h = sim.hunt();
+      if (this.giftDay !== h.day) { this.giftDay = h.day; this.giftSpots = sim.huntSpots(h.day); }
+      const p = this.player.position;
+      this.gifts.forEach((g, i) => {
+        const spot = this.giftSpots[i];
+        const show = !this.interior && !h.found[i] && !sim.s.ride;
+        g.visible = show;
+        if (!show) return;
+        g.position.set(spot.x, 1.3 + Math.sin(this.time * 2 + i) * 0.18, spot.z);
+        g.rotation.y = this.time * 1.4 + i;
+        g.userData.ring.material.opacity = 0.3 + Math.sin(this.time * 4 + i) * 0.15;
+        if (Math.hypot(p.x - spot.x, p.z - spot.z) < 1.8) sim.collectGift(i);
+      });
     }
 
     // Speech bubbles from the sim, plus background chatter between people.

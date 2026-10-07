@@ -718,6 +718,85 @@ button { font: inherit; color: inherit; }
   .ip-grid { gap: 14px 4px; padding: 16px 10px 8px; }
   .ip-close { top: -6px; right: -4px; }
 }
+/* ---------- HUD refresh: slim top pill, goal pills, compact needs, icon nav ---------- */
+.hud-top { gap: 6px; padding: 5px 5px 5px 16px; }
+.hud-top .sep { width: 1px; height: 20px; background: rgba(27, 34, 50, .1); flex: none; }
+.hud-music { width: 38px; height: 38px; border-radius: 50%; border: 0; background: none; color: var(--ink); display: grid; place-items: center; cursor: pointer; margin-left: auto; }
+.hud-music:hover { background: var(--chip); }
+.hud-music .ic { width: 19px; height: 19px; }
+.hud-music .wave { display: none; }
+.hud-music.on .wave { display: inline; }
+.hud-music.on .mute { display: none; }
+.hud-money { border: 0; display: flex; align-items: center; gap: 6px; padding: 4px 4px 4px 14px; cursor: pointer; font: inherit; color: var(--ink); }
+.hud-money .plus { width: 30px; height: 30px; border-radius: 50%; background: var(--mint); color: #fff; font-style: normal; font-weight: 800; font-size: 1.1rem; display: grid; place-items: center; }
+.ic { width: 22px; height: 22px; display: block; }
+
+.hud-left { position: absolute; left: 16px; top: calc(env(safe-area-inset-top, 0px) + 16px); display: flex; flex-direction: column; align-items: flex-start; gap: 8px; width: min(310px, calc(100vw - 32px)); }
+.hud-left .hud-quests { position: static; width: auto; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.pill { display: flex; align-items: center; gap: 9px; border: 0; background: rgba(255, 255, 255, .97); color: var(--ink); border-radius: 999px; padding: 6px 14px 6px 6px; box-shadow: var(--shadow); cursor: pointer; font: inherit; text-align: left; max-width: 100%; }
+.pill .qi { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: #2f7de1; color: #fff; font-size: .95rem; flex: none; }
+.pill .qi.hunt { background: linear-gradient(135deg, #a78bfa, #2f7de1); }
+.pill .qt { min-width: 0; display: grid; gap: 3px; }
+.pill .qt b { font-size: .8rem; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pill .qt small { font-size: .72rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pill em { font-style: normal; font-size: .7rem; font-weight: 800; color: #2f7de1; margin-left: 2px; }
+.qbar { display: block; width: 96px; height: 6px; border-radius: 999px; background: var(--chip); overflow: hidden; }
+.qbar i { display: block; height: 100%; background: #2f7de1; border-radius: 999px; }
+.quest-pill.done .qi { background: var(--mint); }
+.quest-pill.done em { color: var(--mint-d); }
+.quest-pill.done .qbar i { background: var(--mint); }
+.clean-pill { padding: 5px 12px; font-size: .74rem; font-weight: 700; color: var(--muted); }
+.hud.clean .hud-left .hud-quests, .hud.clean .hunt-pill { display: none; }
+.hud.clean .hud-left { display: flex; }
+
+.hud-face { width: 64px; height: 64px; border-width: 3px; }
+.hud-panel { padding: 8px 10px; border-radius: 18px; gap: 6px; }
+.hud-panel .hud-needs { grid-template-columns: repeat(3, auto); column-gap: 10px; row-gap: 6px; min-width: 0; }
+.hud-panel .need { gap: 4px; }
+.hud-panel .need span { width: auto; font-size: .82rem; }
+.hud-panel .need .bar { width: 42px; height: 8px; flex: none; }
+.hud-ability { padding: 4px 11px; font-size: .74rem; }
+
+.hud-nav { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; padding: 6px; border-radius: 26px; width: min(460px, calc(100vw - 24px)); }
+.hud-nav button { padding: 7px 4px; gap: 3px; font-size: .72rem; font-weight: 700; border-radius: 20px; color: #59637a; }
+.hud-nav button > span { position: relative; display: grid; place-items: center; }
+.hud-nav button:disabled { opacity: .35; cursor: default; }
+.hud-nav .badge { top: -8px; right: -12px; }
+
+.hud-keys { position: absolute; right: 16px; bottom: calc(env(safe-area-inset-bottom, 0px) + 84px); width: 42px; height: 42px; border-radius: 50%; border: 0; background: rgba(255, 255, 255, .97); color: #59637a; box-shadow: var(--shadow); display: grid; place-items: center; cursor: pointer; }
+.hud-keys .ic { width: 19px; height: 19px; }
+table.keys { width: 100%; border-collapse: collapse; font-size: .9rem; }
+table.keys td { padding: 6px 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.keys td:first-child { white-space: nowrap; width: 1%; padding-right: 14px; }
+kbd { display: inline-block; min-width: 24px; padding: 2px 7px; margin: 0 2px 2px 0; border-radius: 7px; background: var(--chip); border: 1px solid var(--line); border-bottom-width: 2px; font: 700 .78rem var(--body); text-align: center; }
+@media (min-width: 1441px) { .hud-left { width: 320px; } }
+@media (max-width: 1440px) and (min-width: 901px) { .hud-left { top: calc(env(safe-area-inset-top, 0px) + 112px); } }
+@media (max-width: 900px) {
+  .hud-left { top: calc(env(safe-area-inset-top, 0px) + 66px); width: min(280px, calc(100vw - 90px)); gap: 6px; }
+  .hud-keys { display: none; }
+}
+@media (max-width: 640px) {
+  .hud-left { top: calc(env(safe-area-inset-top, 0px) + 58px); left: 10px; }
+  .hud-left .quest-pill:nth-child(n+2) { display: none; }
+  .pill { padding: 4px 10px 4px 4px; gap: 7px; }
+  .pill .qi { width: 26px; height: 26px; font-size: .8rem; }
+  .pill .qt b { font-size: .74rem; }
+  .qbar { width: 70px; }
+  .clean-pill { display: none; }
+  .hud-music { width: 32px; height: 32px; }
+  .hud-money .plus { display: none; }
+  .hud-money b { font-size: .8rem; }
+  .hud-top { gap: 4px; padding-left: 10px; }
+  .hud-money { padding: 3px 3px 3px 9px; }
+  .hud-top .sep { display: none; }
+  .hud-me { top: calc(env(safe-area-inset-top, 0px) + 150px); }
+  .hud-face { width: 46px; height: 46px; }
+  .hud-panel .hud-needs { width: auto; grid-template-columns: repeat(3, auto); column-gap: 6px; }
+  .hud-panel .need .bar { width: 26px; height: 6px; }
+  .hud-nav { left: 50%; right: auto; transform: translateX(-50%); width: calc(100vw - 20px); }
+  .hud-nav button { font-size: .66rem; padding: 5px 2px; }
+  .hud-nav .ic { width: 20px; height: 20px; }
+}
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }

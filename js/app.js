@@ -335,6 +335,8 @@
     app.raf = requestAnimationFrame(loop);
     renderHud(true);
     if (app.online && app.user) { refreshCity(state.city); pollInbox(); }
+    // Browsers only allow sound after a tap, so music resumes on the first one.
+    if (store.get("december-wahala-music") && window.Music && !Music.on) window.addEventListener("pointerdown", () => setMusic(true), { once: true });
   }
   function stopGame() {
     cancelAnimationFrame(app.raf);
@@ -631,7 +633,7 @@
     if (!sim) return;
     const s = sim.s, c = sim.clock();
     $("h-sun").textContent = c.night ? "🌙" : c.hh < 8 ? "🌅" : "☀️";
-    $("h-time").textContent = `${c.weekday.slice(0, 3)} ${c.day} Dec · ${c.label}`;
+    $("h-time").textContent = window.innerWidth < 640 ? `${c.weekday.slice(0, 3)} ${c.day} · ${c.label}` : `${c.weekday.slice(0, 3)} ${c.day} Dec · ${c.label}`;
     document.querySelectorAll("#h-speed button").forEach((b) => b.classList.toggle("sel", Number(b.dataset.speed) === s.speed && !s.activity && !s.ride));
     const emo = sim.emotion();
     $("h-mood").innerHTML = `${emo.icon} <b>${emo.intensity}${emo.name}</b>`;
@@ -645,7 +647,11 @@
     $("h-naira").classList.toggle("neg", s.naira < 0);
     $("h-usd").textContent = s.usd ? ` · $${Math.round(s.usd).toLocaleString()}` : "";
     setTicker($("h-ticker"), app.online && app.user && app.city.feed.length ? app.city.feed.map((f) => f.text) : [W.phase(c.day).name + ": " + W.phase(c.day).blurb, ...HEADLINES]);
-    const qhtml = sim.quests().map((q) => `<div class="quest${q.done ? " done" : ""}"><span class="qi">${q.icon}</span><div><b>${esc(q.title)}</b><small>${esc(q.sub)}</small></div></div>`).join("");
+    const qhtml = sim.quests().slice(0, 3).map((q, i) => {
+      const m = /(\d[\d,]*)\s*\/\s*\$?(\d[\d,]*)/.exec(q.sub || "");
+      const pct = q.done ? 100 : m ? Math.min(100, Math.round((Number(m[1].replace(/,/g, "")) / Math.max(1, Number(m[2].replace(/,/g, "")))) * 100)) : null;
+      return `<button class="pill quest-pill${q.done ? " done" : ""}" data-quest="${i}" title="${esc(q.sub)}"><span class="qi">${q.icon}</span><span class="qt"><b>${esc(q.title)}</b>${pct !== null ? `<span class="qbar"><i style="width:${pct}%"></i></span>` : `<small>${esc(q.sub)}</small>`}</span>${q.done ? `<em>✓</em>` : pct !== null ? `<em>${pct}%</em>` : ""}</button>`;
+    }).join("");
     if ($("h-quests").dataset.html !== qhtml) { $("h-quests").innerHTML = qhtml; $("h-quests").dataset.html = qhtml; }
     // Me corner.
     const faceKey = JSON.stringify(s.look);
@@ -657,8 +663,11 @@
     const mh = mls.map((m) => `<span class="ml" style="--c:${SIMS.EMOTIONS[m.emotion].color}" title="${esc(m.label)} · ${esc(SIMS.EMOTIONS[m.emotion].name)} +${m.w}${m.until ? ` · ${S.fmtMins(Math.max(1, Math.round(m.until - s.t)))} left` : ""}">${m.icon}</span>`).join("") + `<span class="mini-stats"><span title="Clout">📱 ${Math.round(s.clout)}</span><span title="Reputation">🤝🏾 ${Math.round(s.rep)}</span><span title="Connections">🔗 ${Math.round(s.conn)}</span><span title="Followers">👥 ${compact(s.followers)}</span></span>`;
     if ($("h-moodlets").dataset.html !== mh) { $("h-moodlets").innerHTML = mh; $("h-moodlets").dataset.html = mh; }
     const pl = s.place && sim.places[s.place];
-    $("h-here").hidden = !(pl && (s.inside || pl.kind === "open") && !s.ride);
-    $("h-buy").hidden = !(s.place === "home" && s.inside);
+    $("h-here").disabled = !(pl && (s.inside || pl.kind === "open") && !s.ride);
+    const h = sim.hunt(), found = h.found.filter(Boolean).length;
+    const hh = `<span class="qi hunt">🎁</span><span class="qt"><b>Daily gift hunt</b><small>${found}/3 found${found < 3 ? ` · next prize ${naira(sim.huntPrize(found))}` : " · come back tomorrow"}</small></span>`;
+    if ($("h-hunt").dataset.html !== hh) { $("h-hunt").innerHTML = hh; $("h-hunt").dataset.html = hh; }
+    if (window.Music) Music.setLevel(s.speed === 0 || s.over ? 0.35 : c.night ? 0.7 : 1);
     const P = sim.P, why = sim.abilityBlocked();
     $("h-ability").textContent = `${P.ability.icon} ${P.ability.name}`;
     $("h-ability").disabled = !!why;
@@ -808,7 +817,7 @@
     if (app.pressing && p && !$("sheet").hidden) return;
     $("sheet").hidden = !p;
     $("sheet").classList.toggle("phone", p === "phone");
-    document.querySelectorAll("#h-nav button").forEach((b) => b.classList.toggle("sel", b.dataset.panel === p));
+    document.querySelectorAll("#h-nav button").forEach((b) => b.classList.toggle("sel", b.dataset.panel === (p || "")));
     if (!p) return;
     const fn = { place: panelPlace, me: panelMe, bag: panelBag, map: panelMap, phone: panelPhone, buy: panelBuy }[p];
     const [title, html] = fn();
@@ -1152,6 +1161,10 @@
     if (k === "m") { app.panel === "map" ? closeSheet() : openPanel("map"); }
     if (k === "p") { app.panel === "phone" ? closeSheet() : openPanel("phone"); }
     if (k === "b" || k === "i") { app.panel === "bag" ? closeSheet() : openPanel("bag"); }
+    if (k === "u") { app.panel === "me" ? closeSheet() : openPanel("me"); }
+    if (k === "h" && !$("h-here").disabled) { app.panel === "place" ? closeSheet() : openPanel("place"); }
+    if (k === "n") setMusic(!(window.Music && Music.on));
+    if (e.key === "?") openModal("m-keys");
     if (k === " " && !e.repeat) { e.preventDefault(); if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); app.sim.s.speed = app.sim.s.speed ? 0 : 1; renderHud(); }
     if (["1", "2", "3"].includes(k)) app.sim.s.speed = Number(k);
   });
@@ -1207,11 +1220,31 @@
 
   // HUD controls.
   $("h-speed").addEventListener("click", (e) => { const b = e.target.closest("[data-speed]"); if (b && app.sim) { app.sim.s.speed = Number(b.dataset.speed); renderHud(); } });
-  $("h-nav").addEventListener("click", (e) => { const b = e.target.closest("[data-panel]"); if (!b) return; if (app.panel === b.dataset.panel) closeSheet(); else openPanel(b.dataset.panel); renderHud(true); });
+  $("h-nav").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-panel]");
+    if (!b || b.disabled) return;
+    const id = b.dataset.panel;
+    if (!id || app.panel === id) closeSheet(); else { if (id === "phone") app.phoneApp = null; openPanel(id); }
+    closePie();
+    renderHud(true);
+  });
+  $("h-quests").addEventListener("click", (e) => { if (e.target.closest("[data-quest]")) { openPanel("phone"); app.phoneApp = "missions"; refreshPanel(); renderHud(true); } });
+  $("h-hunt").addEventListener("click", () => { if (app.sim) toast(app.sim.huntHint()); });
+  $("h-wallet").addEventListener("click", () => { openPanel("phone"); app.phoneApp = "bank"; refreshPanel(); renderHud(true); });
+  $("h-keys").addEventListener("click", () => openModal("m-keys"));
+  function setMusic(on) {
+    if (!window.Music) return;
+    if (on) Music.start(); else Music.stop();
+    $("h-music").classList.toggle("on", Music.on);
+    $("h-music").setAttribute("aria-pressed", String(Music.on));
+    $("h-music").setAttribute("aria-label", Music.on ? "Turn music off" : "Turn music on");
+    store.set("december-wahala-music", Music.on);
+  }
+  $("h-music").addEventListener("click", () => setMusic(!(window.Music && Music.on)));
   $("h-phone-btn").addEventListener("click", () => { if (app.panel === "phone") { closeSheet(); renderHud(true); return; } openPanel("phone"); app.phoneApp = app.sim && app.sim.s.phone.unread ? "chats" : null; refreshPanel(); renderHud(true); });
   $("h-face").addEventListener("click", () => { openPanel("me"); renderHud(true); });
   $("h-ability").addEventListener("click", () => { app.sim.useAbility(); renderHud(true); });
-  $("h-clean").addEventListener("click", () => { $("hud").classList.toggle("clean"); $("h-clean").textContent = $("hud").classList.contains("clean") ? "⌄ Show HUD" : "⌃ Clean screen"; });
+  $("h-clean").addEventListener("click", () => { $("hud").classList.toggle("clean"); $("h-clean").textContent = $("hud").classList.contains("clean") ? "⌄ Show goals" : "⌃ Clean screen"; });
   $("h-menu").addEventListener("click", () => {
     $("menu-who").textContent = app.online && app.user ? `Signed in as @${app.user.username}. Your game saves to your account automatically.` : "Playing offline as a guest. Your game saves on this device.";
     $("btn-logout").textContent = app.online && app.user ? "Log out" : "Back to the city";
