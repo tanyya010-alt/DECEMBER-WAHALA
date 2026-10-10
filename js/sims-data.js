@@ -514,6 +514,7 @@
     concert: [{ label: "Main stage", icon: "🎤", act: ["concert", "concert_photo_gig", "resell_tickets", "crossover"] }],
     beach: [{ label: "Beach", icon: "🏖️", act: ["chill", "picnic", "beach_party", "beach_photos", "crossover"] }],
     photo: [{ label: "Detty Wall", icon: "📸", act: ["photoshoot", "collab"] }],
+    airport: [{ label: "Terminal", icon: "🛫", act: ["board_flight", "pickup", "watch_arrivals"] }],
     balogun: [{ label: "Wholesale stalls", icon: "📦", act: ["wholesale_buy", "haggle_hunt", "market_xmas"] }],
     lekkistreet: [{ label: "Party house", icon: "🏠", act: ["house_party"] }, { label: "The close", icon: "🛵", act: ["street_hang", "neighbour_gist"] }],
   };

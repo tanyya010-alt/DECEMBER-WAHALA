@@ -718,7 +718,7 @@
       const a = this.actionDef(id);
       const p = this.places[placeId];
       // Instant actions open a menu instead of taking time.
-      if (["bdc", "bdcbuy", "bdcmall", "shop", "accessories", "hair", "concept"].includes(a.special)) { this.openMenu(a.special, placeId); return true; }
+      if (["bdc", "bdcbuy", "bdcmall", "shop", "accessories", "hair", "concept", "flights"].includes(a.special)) { this.openMenu(a.special, placeId); return true; }
       if (["djgame", "selfie", "reel"].includes(a.special)) { s.minigame = { kind: a.special === "djgame" ? "dj" : a.special, place: placeId, id, celeb: s.celeb ? s.celeb.id : null, t: s.t }; return true; }
       if (a.dress === "owambe" && !["tradfusion", "afrochic"].includes(s.look.style)) this.log("👀 Aunties are looking at your outfit. No aso-ebi?", "bad");
       const cost = this.actionCost(id, placeId);
@@ -1069,6 +1069,14 @@
         });
         choices.push({ label: "Nothing today" });
         ev = { title: "Shoes, Bags & Jewellery", icon: "👜", text: "Accessories add clout — and the bouncer checks your shoes.", choices };
+      } else if (kind === "flights") {
+        const h = this.clock().hh;
+        const choices = Object.entries(this.flightList()).map(([k, F]) => {
+          const ok = h >= F.window[0] && h < F.window[1];
+          return { label: `${F.icon} ${F.name}`, note: ok ? `${F.code} · ${fmtMins(F.mins)}` : `Departs ${F.window[0]}:00–${F.window[1]}:00 only`, cost: ok ? this.price(F.cost, "airport") : 0, flight: ok ? k : null, text: ok ? "" : " No flight at this hour." };
+        }).filter((c) => c.flight);
+        choices.push({ label: choices.length ? "Not today" : "No more flights today. Come back tomorrow morning." });
+        ev = { title: "Departures", icon: "🛫", text: "Pick a flight. You'll watch it all from your window seat: boarding, take-off over the city, the clouds and the landing.", choices };
       } else if (kind === "concept") {
         const choices = Object.entries(W.ITEMS).filter(([k, it]) => it.kind === "limited" && !(s.inventory[k] > 0)).map(([k, it]) => {
           const d = this.dropStatus(k);
@@ -1344,6 +1352,39 @@
       this.addMoodlet("debtor");
       this.addStat("rep", -3);
       this.queue({ title: "Card Declined… Then \"Approved\"", icon: "💳", text: `The bill came to ${naira(bill)}. Your card went through on an overdraft and now you're ${naira(-s.naira)} in the red. Until you're back above zero, you're a Debtor: velvet ropes stay shut, the Island won't sell you anything, and the bank keeps texting. Side gigs on the mainland pay 40% extra while you're owing.`, choices: [{ label: "Me? I go hustle am back 😤" }] });
+    }
+    // Flights from the airport: a joyride over the city or a day trip and back.
+    flightList() {
+      const lagos = this.s.city === "lagos";
+      const home = lagos ? "Lagos (LOS)" : "Abuja (ABV)";
+      return {
+        joy: { name: `Sunset joyride over ${lagos ? "Lagos" : "Abuja"}`, icon: "🌇", code: "DW 101", from: home, to: home, mins: 60, cost: 85000, window: [7, 19], joy: true, fx: { vibes: 25 }, clout: 6, followers: 400, stress: -15, summary: "" },
+        trip: lagos
+          ? { name: "Day trip to Abuja (back tonight)", icon: "🏛️", code: "DW 247", from: home, to: "Abuja (ABV)", mins: 600, cost: 220000, window: [6, 13], fx: { vibes: 20, energy: -8, belle: 20 }, clout: 8, conn: 8, stress: -5, summaryTitle: "A day in Abuja", summary: "Lunch in Wuse II, a meeting in Maitama, suya at Area 11 and a selfie at the Millennium Park arch. Back on the last flight." }
+          : { name: "Day trip to Lagos (back tonight)", icon: "🌴", code: "DW 248", from: home, to: "Lagos (LOS)", mins: 600, cost: 220000, window: [6, 13], fx: { vibes: 24, energy: -8, belle: 20 }, clout: 9, conn: 6, stress: -5, summaryTitle: "A day in Lagos", summary: "Traffic on Third Mainland, jollof in Lekki, a beach club in VI and the sunset at Tarkwa Bay. Back on the last flight." },
+        ph: { name: "Port Harcourt wedding hop (back tonight)", icon: "💍", code: "DW 318", from: home, to: "Port Harcourt (PHC)", mins: 660, cost: 180000, window: [6, 12], fx: { vibes: 28, energy: -10, belle: 30 }, rep: 6, clout: 5, stress: -8, summaryTitle: "A wedding in Port Harcourt", summary: "Rivers native soup, a six-hour reception and a groom who sprayed dollars. You caught the last flight home." },
+      };
+    }
+    flightInfo() { const g = this.s.minigame; return g && g.kind === "flight" ? { ...this.flightList()[g.dest], key: g.dest } : null; }
+    finishFlight() {
+      const s = this.s, g = s.minigame;
+      if (!g || g.kind !== "flight") return;
+      const F = this.flightList()[g.dest];
+      s.minigame = null;
+      // You ate, freshened up and used the loo on your trip.
+      if (F.mins > 120) { const n = s.needs; n.bladder = 100; n.belle = Math.max(n.belle, 85); n.hygiene = Math.max(n.hygiene, 80); n.social = Math.max(n.social, 80); n.energy = Math.max(n.energy, 70); }
+      this.passTime(F.mins);
+      s.place = "airport"; s.inside = true; s.pos = { ...this.places.airport.spot };
+      this.applyFx(F.fx);
+      ["clout", "rep", "conn", "followers"].forEach((k) => { if (F[k]) this.addStat(k, F[k]); });
+      if (F.stress) this.addStress(F.stress);
+      s.stats.flights = (s.stats.flights || 0) + 1;
+      this.addMoodlet(F.joy ? "inspired_art" : "big_spender");
+      this.addMemory(F.joy ? `🛫 Saw ${s.city === "lagos" ? "Lagos" : "Abuja"} from the sky · ${this.day()} Dec` : `🛫 ${F.summaryTitle} · ${this.day()} Dec`);
+      if (!F.joy) this.unlock("jetsetter");
+      this.log(`🛬 ${F.code} landed. ${F.joy ? "The city looked unreal from up there." : F.summary}`, "good");
+      this.checkAchievements();
+      this.flush();
     }
     // Mini-game results (the renderer runs the games).
     cancelMinigame() { this.s.minigame = null; }
@@ -1678,6 +1719,7 @@
       if (o.buyStyle) { this.addStyle(o.buyStyle); this.log(`🛍️ ${D.STYLES[o.buyStyle].name} added to your wardrobe. Change at home or right here.`, "good"); }
       if (o.buyItem) { s.inventory[o.buyItem] = (s.inventory[o.buyItem] || 0) + 1; const it = W.ITEMS[o.buyItem]; if (["shoes", "bag", "jewelry"].includes(it.kind)) this.equipItem(o.buyItem); this.log(`${it.icon} Bought: ${it.name}.`, "good"); }
       if (o.buyLimited) this.gotLimited(o.buyLimited);
+      if (o.flight) s.minigame = { kind: "flight", dest: o.flight, place: s.place, t: s.t };
       if (o.stress) this.addStress(o.stress);
       if (o.romanceTo) for (const id in o.romanceTo) { const st = this.whoState(id); if (st) { st.met = true; st.romance = clamp((st.romance || 0) + o.romanceTo[id]); } }
       if (o.moodlet) this.addMoodlet(o.moodlet);

@@ -437,6 +437,12 @@
   function launchMinigame() {
     const sim = app.sim, s = sim.s, g = s.minigame;
     closePie();
+    if (g.kind === "flight") {
+      if (app.flightOn) return;
+      app.flightOn = true; closeSheet();
+      app.world.playFlight(sim.flightInfo(), () => { app.flightOn = false; sim.finishFlight(); renderHud(true); toast(lastLog(), "good"); });
+      return;
+    }
     const place = sim.places[g.place] ? sim.places[g.place].name : "";
     const after = (good) => { renderHud(true); toast(lastLog(), good ? "good" : "bad"); };
     if (g.kind === "dj") {
@@ -648,7 +654,8 @@
           } });
         });
       }
-      items.push({ icon: "🚶🏾", label: "Walk here", run: () => { clearQueue(); w.walkTo(p.id, () => { if (p.kind !== "building") sim.enter(p.id); }); } });
+      if (p.remote && s.place !== p.id) { items.length = 0; items.push({ icon: "🚗", label: "Take a Bolt to the airport", run: () => { app.mapSel = p.id; openPanel("map"); } }); }
+      if (!p.remote) items.push({ icon: "🚶🏾", label: "Walk here", run: () => { clearQueue(); w.walkTo(p.id, () => { if (p.kind !== "building") sim.enter(p.id); }); } });
     } else if (pick.kind === "self") {
       title = s.name; const e = sim.emotion(); sub = `${e.icon} ${e.intensity}${e.name}`;
       const canChange = s.place === "home" || ["hotel", "fashion", "mall", "family"].includes(sim.places[s.place] && sim.places[s.place].type);

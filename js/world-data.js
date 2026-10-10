@@ -49,7 +49,7 @@
     balogun: { icon: "🧺", kind: "open", hours: [hm("07:00"), hm("19:00")], actions: ["wholesale_buy", "haggle_hunt", "market_xmas"] },
     beach: { icon: "🏖️", kind: "open", hours: [hm("08:00"), hm("19:00")], actions: ["chill", "beach_party", "picnic", "beach_photos"] },
     photo: { icon: "📸", kind: "open", hours: null, actions: ["photoshoot", "collab"] },
-    airport: { icon: "✈️", kind: "remote", hours: null, actions: ["pickup", "watch_arrivals"] },
+    airport: { icon: "✈️", kind: "remote", hours: null, actions: ["board_flight", "pickup", "watch_arrivals"] },
     shortlet: { icon: "🔑", kind: "building", h: 8, color: "#f4f4f2", roof: "#8a6b4a", hours: null, actions: ["book_penthouse", "chef_dinner", "wine_tasting", "movie_night", "content_shoot", "penthouse_party"] },
     // Lekki Phase 1: the social middle ground.
     lekkilounge: { icon: "🌴", kind: "building", h: 7, color: "#2a1f3d", roof: "#ff3dbb", neon: "#ff3dbb", hours: [hm("12:00"), hm("28:00")], actions: ["lekki_hangout", "lekki_lounge_chat", "lekki_club_night", "drinks"] },
@@ -114,7 +114,7 @@
     out.beachclub = { id: "beachclub", type: "beachclub", name: NAMES[city].beachclub, icon: TYPES.beachclub.icon, kind: "building", x: 23, z: 56.5, w: 18, d: 9, h: 4, side: "N", door: { x: 23, z: 51.4 }, spot: { x: 23, z: 50.2 } };
     out.shortlet = { id: "shortlet", type: "shortlet", name: NAMES[city].shortlet, icon: TYPES.shortlet.icon, kind: "building", x: -8, z: 56.5, w: 18, d: 9, h: 8, side: "N", door: { x: -8, z: 51.4 }, spot: { x: -8, z: 50.2 } };
     out.conceptstore = { id: "conceptstore", type: "conceptstore", name: NAMES[city].conceptstore, icon: TYPES.conceptstore.icon, kind: "building", x: 57, z: 56.5, w: 12, d: 9, h: 6, side: "N", door: { x: 57, z: 51.4 }, spot: { x: 57, z: 50.2 } };
-    out.airport = { id: "airport", type: "airport", name: NAMES[city].airport, icon: TYPES.airport.icon, kind: "remote", x: 86, z: -52, w: 0, d: 0, h: 0, side: "N", door: { x: 86, z: -52 }, spot: { x: 86, z: -52 }, remote: true };
+    out.airport = { id: "airport", type: "airport", name: NAMES[city].airport, icon: TYPES.airport.icon, kind: "remote", x: 55, z: -66, w: 0, d: 0, h: 0, side: "N", door: { x: 55, z: -66 }, spot: { x: 55, z: -66.5 }, remote: true };
     for (const p of Object.values(out)) p.zone = zoneAt(city, p.x, p.z).id;
     return out;
   }
@@ -295,6 +295,7 @@
     collab: { name: "Collab with a creator", icon: "🎬", mins: 90, special: "collab" },
     // Airport
     pickup: { name: "Pick up arriving family", icon: "🛬", mins: 40, special: "pickup" },
+    board_flight: { name: "Board a flight", icon: "🛫", mins: 0, special: "flights" },
     watch_arrivals: { name: "Watch IJGBs land in matching tracksuits", icon: "👀", mins: 30, fx: { vibes: 6 }, gossip: 1 },
   };
 
@@ -654,6 +655,7 @@
     lover: { name: "December Lover", icon: "💞", desc: "Start a relationship." },
     starstruck: { name: "Starstruck", icon: "🤩", desc: "Got a selfie or Reel with a celebrity." },
     lekki_legend: { name: "Lekki Legend", icon: "🌴", desc: "Showed up when your friends called, even when you were broke." },
+    jetsetter: { name: "Jet Setter", icon: "🛫", desc: "Took a flight out of the city and made it back." },
     last_standing: { name: "Last Man Standing", icon: "🌅", desc: "Still partying at 4am." },
     jollof: { name: "Jollof Royalty", icon: "🥘", desc: "Cook party jollof 3 times." },
     airport: { name: "Airport Legend", icon: "✈️", desc: "Pick up every arriving relative yourself." },

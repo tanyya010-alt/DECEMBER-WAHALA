@@ -976,3 +976,25 @@ kbd { display: inline-block; min-width: 24px; padding: 2px 7px; margin: 0 2px 2p
 .sw { display: block; height: 70px; border-radius: 999px; background: linear-gradient(90deg, var(--a) 50%, var(--b) 50%); }
 .sw.floor { border-radius: 999px; background: repeating-conic-gradient(var(--a) 0 25%, var(--b) 0 50%) 0 0 / 50% 50%; }
 @media (max-width: 560px) { .sheet.catalogue { width: auto; left: 8px; right: 8px; transform: none; height: 62vh; bottom: calc(env(safe-area-inset-bottom, 0px) + 76px); } .cat-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; } .cat-pic { height: 100px; } .cat-tab { padding: 7px 12px; font-size: .82rem; } }
+
+/* ---------- Flights ---------- */
+body.flying #screen-game .hud, body.flying .world-labels { display: none !important; }
+.flight { position: fixed; inset: 0; z-index: 70; pointer-events: none; font-family: var(--body); }
+.flight > * { pointer-events: auto; }
+.fl-window { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .4s; }
+.flight.win .fl-window { opacity: 1; }
+.fl-window::before { content: ""; position: absolute; left: 50%; top: 50%; width: min(62vw, 560px); height: min(78vh, 700px); transform: translate(-50%, -50%); border-radius: 46% / 32%; box-shadow: 0 0 0 30px #d9dde3, 0 0 0 46px #c3c8cf, 0 0 0 2000px #eceef1, inset 0 0 40px rgba(0,0,0,.35); }
+.fl-window::after { content: ""; position: absolute; left: 50%; top: 50%; width: min(62vw, 560px); height: min(78vh, 700px); transform: translate(-50%, -50%); border-radius: 46% / 32%; background: linear-gradient(130deg, rgba(255,255,255,.18), transparent 40%); }
+.fl-card { position: absolute; top: calc(env(safe-area-inset-top, 0px) + 14px); left: 50%; transform: translateX(-50%); width: min(460px, calc(100vw - 24px)); background: rgba(13, 18, 34, .9); color: #fff; border-radius: 18px; padding: 12px 16px; box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+.fl-top { display: flex; justify-content: space-between; gap: 10px; font-size: .9rem; }
+.fl-top b { color: #5ef08a; }
+.fl-phase { font-family: var(--display); font-size: 1.1rem; margin: 6px 0; }
+.fl-stats { display: flex; gap: 16px; font-size: .78rem; color: #aab3cc; }
+.fl-stats b { color: #fff; font-size: .95rem; }
+.fl-bar { height: 6px; border-radius: 999px; background: rgba(255,255,255,.15); margin-top: 8px; overflow: hidden; }
+.fl-bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #5ef08a, #20d6e6); }
+.fl-btns { position: absolute; bottom: calc(env(safe-area-inset-bottom, 0px) + 20px); left: 50%; transform: translateX(-50%); display: flex; gap: 10px; }
+.fl-fade { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+.fl-summary { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(420px, calc(100vw - 32px)); background: #fff; color: var(--ink); border-radius: 22px; padding: 22px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,.3); }
+.fl-summary h3 { font-family: var(--display); margin: 0 0 8px; }
+.fl-summary p { color: var(--muted); margin: 0 0 14px; }

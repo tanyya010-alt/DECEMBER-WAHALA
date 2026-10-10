@@ -60,6 +60,7 @@ for (let seed = 1; seed <= RUNS; seed++) {
     }
     if (s.minigame) {
       seen.minigames = (seen.minigames || 0) + 1;
+      if (s.minigame.kind === "flight") { seen.flights = (seen.flights || 0) + 1; g.finishFlight(); continue; }
       if (s.minigame.kind === "dj") g.finishDj(pick(100) / 100, pick(40)); else if (pick(5)) g.finishSelfie(pick(100) / 100); else g.cancelMinigame();
       continue;
     }
@@ -153,5 +154,6 @@ console.log(`  luxury zone: minigames ${seen.minigames || 0} · celebs met ${see
   const g2 = new Sim(st, 5);
   assert(g2.s.strangers.length === 30 && g2.s.home && g2.s.skills && Number.isFinite(g2.s.needs.bladder) && g2.emotion().id, "migration failed");
   console.log("  old save migration: ok");
+console.log(`  flights taken by bots: ${seen.flights || 0}`);
 console.log(`  catalogue: ${SIMS.CATALOGUE.ITEMS.length} items, ${seen.catalogue || 0} bought by bots`);
 }

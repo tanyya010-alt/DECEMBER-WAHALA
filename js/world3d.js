@@ -122,7 +122,7 @@
       this.buildCity();
       this.buildVehicles();
       // Walk grid for click-to-move around the city.
-      this.cityNav = new GridNav(G.bounds.x[0] - 2, -62, G.bounds.x[1] + 2, 64, 1);
+      this.cityNav = new GridNav(G.bounds.x[0] - 2, -110, G.bounds.x[1] + 2, 64, 1);
       this.colliders.forEach((c) => this.cityNav.block(c, PLAYER_R));
       this.marker = new THREE.Mesh(new THREE.RingGeometry(0.35, 0.55, 24), new THREE.MeshBasicMaterial({ color: 0x20b46e, transparent: true, opacity: 0.9, side: THREE.DoubleSide }));
       this.marker.rotation.x = -Math.PI / 2; this.marker.visible = false;
@@ -157,7 +157,7 @@
 
     buildCity() {
       const lagos = this.city === "lagos";
-      const land = lagos ? 0xd6e4b5 : 0xcfe3b0;
+      const land = lagos ? 0x9fcb7e : 0xa7cf86;
       this.add(new THREE.Mesh(new THREE.PlaneGeometry(220, 200), lam(land)), 0, -0.02, 5).rotation.x = -Math.PI / 2;
 
       // Block pads (pavements and plazas).
@@ -271,6 +271,14 @@
       for (const x of G.cols) for (const z of G.rows) {
         if (Object.values(this.places).some((p) => !p.remote && Math.abs(p.x - x) < 10 && Math.abs(p.z - z) < 7)) continue;
         this.buildHomes(x, z);
+      }
+      // The airport north of Ikeja, billboards and floating place icons.
+      if (this.buildAirport) {
+        const n0 = this.cityGroup.children.length;
+        this.buildAirport();
+        const pick = { kind: "place", id: "airport" };
+        for (let i = n0; i < this.cityGroup.children.length; i++) { const m = this.cityGroup.children[i]; m.traverse((o) => { if (o.isMesh) o.userData.pick = pick; }); if (m.isMesh) this.pickables.push(m); else m.traverse((o) => { if (o.isMesh) this.pickables.push(o); }); }
+        this.buildBillboards(); this.buildPlaceIcons();
       }
       // Street lamps along the roads.
       const lampPos = [];
@@ -874,7 +882,7 @@
       const s = this.sim.s;
       let p;
       if (s.pos) p = s.pos;
-      else { const pl = this.places[s.place && !this.places[s.place].remote ? s.place : "home"]; p = pl.spot; }
+      else { const pl = this.places[s.place && (!this.places[s.place].remote || s.place === "airport") ? s.place : "home"]; p = pl.spot; }
       this.player.position.set(p.x, 0, p.z);
       this.player.rotation.y = Math.PI;
       const pl = s.place && this.places[s.place];
@@ -1082,6 +1090,7 @@
     update(dt, realDt) {
       this.time += realDt;
       const s = this.sim.s;
+      if (this.flight) { this.updateFlight(realDt); this.updateAirport(realDt); this.updateAmbient(realDt); this.hemi.intensity *= 0.62; this.sun.intensity *= 0.6; this.renderer.render(this.scene, this.camera); return; }
       this.syncRoom();
       if (s.ride === null && this.wasRiding && s.pos) { this.leaveInterior(); this.player.position.set(s.pos.x, 0, s.pos.z); this.snapCamera = true; }
       this.wasRiding = !!s.ride;
@@ -1213,6 +1222,7 @@
       this.updateGifts(realDt);
       this.updateBubbles(realDt);
       this.updateAmbient(realDt);
+      if (this.updateAirport) this.updateAirport(realDt);
       this.findTarget();
       this.updateLabels();
       this.renderer.render(this.scene, this.camera);
