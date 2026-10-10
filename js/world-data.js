@@ -45,7 +45,7 @@
     suya: { icon: "🍢", kind: "open", hours: [hm("17:00"), hm("26:00")], actions: ["suya", "suya_hang"] },
     club: { icon: "🪩", kind: "building", h: 8, color: "#1d1b2e", roof: "#000000", neon: "#ff3dbb", hours: [hm("22:00"), hm("28:00")], actions: ["party", "dance", "club_meet", "club_network", "club_photos", "start_drama", "vip"] },
     concert: { icon: "🎤", kind: "open", hours: [hm("16:00"), hm("25:00")], eventOnly: "concert", actions: ["concert", "concert_photo_gig", "resell_tickets"] },
-    lounge: { icon: "🌇", kind: "building", h: 16, color: "#263238", roof: "#ffb300", neon: "#ffb300", hours: [hm("17:00"), hm("26:00")], actions: ["sunset_drinks", "lounge_network"] },
+    lounge: { icon: "🌇", kind: "building", h: 16, color: "#263238", roof: "#ffb300", neon: "#ffb300", hours: [hm("17:00"), hm("26:00")], actions: ["sunset_drinks", "firepit_chill", "rooftop_party", "lounge_network", "club_photos"] },
     beach: { icon: "🏖️", kind: "open", hours: [hm("08:00"), hm("19:00")], actions: ["chill", "beach_party", "picnic", "beach_photos"] },
     photo: { icon: "📸", kind: "open", hours: null, actions: ["photoshoot", "collab"] },
     airport: { icon: "✈️", kind: "remote", hours: null, actions: ["pickup", "watch_arrivals"] },
@@ -211,6 +211,9 @@
     sundowner: { name: "Sundowner cocktails at the pergola", icon: "🌅", mins: 60, cost: 18000, fx: { vibes: 16, social: 10 }, clout: 2, window: [16, 21], special: "datecheck" },
     vip_cabana: { name: "Book a VIP cabana (bottle service)", icon: "🍾", mins: 180, cost: 250000, fx: { vibes: 38, social: 20, energy: -10 }, clout: 14, conn: 6, big: true, premium: true, special: "vip" },
     beachclub_party: { name: "Party at the DJ set", icon: "🎧", mins: 180, cost: 20000, fx: { vibes: 34, energy: -18 }, clout: 6, big: true, dress: "club", window: [21, 3], special: "party" },
+    // High-octane rooftop: fire pits and a DJ hub over the city.
+    firepit_chill: { name: "Chill by the fire pit", icon: "🔥", mins: 60, cost: 8000, fx: { vibes: 14, social: 12, energy: 4 }, clout: 1 },
+    rooftop_party: { name: "Rooftop DJ night", icon: "🎛️", mins: 180, cost: 25000, fx: { vibes: 34, energy: -18 }, clout: 6, big: true, dress: "club", window: [21, 2], special: "party" },
     pool_day: { name: "Pool day", icon: "🏊🏾", mins: 120, cost: 15000, fx: { vibes: 18, energy: 6 }, clout: 3 },
     lobby_network: { name: "Network in the lobby", icon: "🧳", mins: 45, conn: 5, special: "meet" },
     rent_car: { name: "Rent a car for the day", icon: "🚙", mins: 20, cost: 80000, special: "rentcar" },

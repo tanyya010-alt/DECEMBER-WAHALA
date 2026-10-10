@@ -93,7 +93,7 @@
     service: "blessed", pray: "blessed", carol: "blessed",
     salon_gossip: "gossip", owambe_gossip: "gossip", gist_vendor: "gossip",
     new_hair: "complimented", start_drama: "argued", sunset_drinks: "flirted", host: "partied",
-    pool_swim: "fresh", daybed_lounge: "entertained", beach_brunch: "great_food", sundowner: "flirted", vip_cabana: "big_spender", beachclub_party: "partied",
+    firepit_chill: "laughed", rooftop_party: "partied", pool_swim: "fresh", daybed_lounge: "entertained", beach_brunch: "great_food", sundowner: "flirted", vip_cabana: "big_spender", beachclub_party: "partied",
   };
 
   // What each emotion does. soc: social success; cats: per-category bonus;
@@ -166,7 +166,7 @@
   const SKILL_OF = {
     cook: "cooking", takeaway_jollof: null,
     party: "dancing", dance: "dancing", owambe_attend: "dancing", beach_party: "dancing", dance_home: "dancing", concert: "dancing",
-    workout: "fitness", chores: "fitness", pool_swim: "fitness", beachclub_party: "dancing",
+    workout: "fitness", chores: "fitness", pool_swim: "fitness", beachclub_party: "dancing", rooftop_party: "dancing", firepit_chill: "charisma",
     post_home: "photography", club_photos: "photography", beach_photos: "photography", photoshoot: "photography", collab: "photography",
     work_shift: "hustle", sell_phones: "hustle", delivery: "hustle", small_chops: "hustle", conductor_gig: "hustle", event_setup: "hustle", concert_photo_gig: "photography", resell_tickets: "hustle", broker: "hustle", remote_work: "hustle", laptop_work: "hustle",
     gist_vendor: "charisma", salon_gossip: "charisma", owambe_network: "charisma", club_network: "charisma", lounge_network: "charisma", lobby_network: "charisma", gym_network: "charisma", practice_speech: "charisma", restaurant_meet: "charisma", cafe_meet: "charisma", mall_meet: "charisma", office_gist: "charisma",
@@ -197,7 +197,7 @@
     post_home: "phone", club_photos: "phone", beach_photos: "phone", photoshoot: "phone", collab: "phone",
     pray: "pray", carol: "sing", party: "dance", dance: "dance", owambe_attend: "dance", beach_party: "dance", concert: "dance",
     workout: "workout", chores: "workout", cook: "cook", takeaway_jollof: "stand",
-    pool_swim: "swim", daybed_lounge: "lie", beach_brunch: "eat", sundowner: "drink", vip_cabana: "sit", beachclub_party: "dance",
+    firepit_chill: "sit", rooftop_party: "dance", pool_swim: "swim", daybed_lounge: "lie", beach_brunch: "eat", sundowner: "drink", vip_cabana: "sit", beachclub_party: "dance",
   };
 
   // ------------------------------------------------------------ social interactions
@@ -344,11 +344,17 @@
       T("photowall", -6.6, 3.8, ["club_photos"], { label: "Photo wall", icon: "📸" }),
       T("toilet", 7.6, 6, ["toilet"], { label: "Toilets", icon: "🚽" }),
     ] },
-    lounge: { w: 16, d: 12, floor: ["#263238", "#37474f"], wall: "#263238", light: 0xffc46b, dark: true, objects: [
-      tableSet(-4, -2, ["sunset_drinks"]), tableSet(1, -2, ["sunset_drinks"]), tableSet(-1.5, 2.6, ["sunset_drinks"]),
-      T("bar", 6.6, 0, ["drinks", "lounge_network", "crossover"], { label: "Bar", icon: "🍹", w: 1.4, d: 6, seats: [[5.5, -1.5, Math.PI / 2, "drink"], [5.5, 1.5, Math.PI / 2, "drink"]], vendorSpot: [7.4, 0, -Math.PI / 2] }),
-      T("couch", -6, 3.6, ["lounge_network", "sit_chill"], { label: "Lounge sofas", icon: "🛋️", seats: [[-6.6, 3, Math.PI / 2, "sit"], [-5.2, 4.6, Math.PI, "sit"]] }),
-      T("toilet", 7, 5, ["toilet"], { label: "Toilet", icon: "🚽" }),
+    // High-octane rooftop club and DJ hub, open to the city skyline.
+    lounge: { w: 26, d: 18, open: true, setting: "rooftop", floor: ["#5c6168", "#52575e"], wall: "#6b7078", light: 0xffc46b, stringLights: true, objects: [
+      T("djstage", 0, -7.4, ["request_song"], { label: "DJ hub", icon: "🎛️", w: 8, d: 2.6, vendorSpot: [0, -7.6, 0] }),
+      T("dancedeck", 0, -3.6, ["rooftop_party", "dance", "crossover"], { label: "Dance floor", icon: "💃🏾", w: 9, d: 4, seats: [[-3, -4, 0, "dance"], [-1, -3.4, 0, "dance"], [1, -4.1, 0, "dance"], [3, -3.5, 0, "dance"], [-2, -2.4, 0, "dance"], [2, -2.5, 0, "dance"]] }),
+      T("firepit", -6.5, 3.4, ["firepit_chill", "sit_chill"], { label: "Fire pit lounge", icon: "🔥", w: 4.4, d: 1.2, seats: [[-8, 1.9, 0, "sit"], [-6.5, 1.9, 0, "sit"], [-5, 1.9, 0, "sit"], [-8, 4.9, Math.PI, "sit"], [-6.5, 4.9, Math.PI, "sit"], [-5, 4.9, Math.PI, "sit"]] }),
+      T("firepit", 5.5, 4.6, ["firepit_chill", "sunset_drinks", "lounge_network"], { label: "Fire pit lounge", icon: "🔥", w: 4.4, d: 1.2, seats: [[4, 3.1, 0, "sit"], [5.5, 3.1, 0, "sit"], [7, 3.1, 0, "sit"], [4, 6.1, Math.PI, "sit"], [5.5, 6.1, Math.PI, "sit"], [7, 6.1, Math.PI, "sit"]] }),
+      T("shedbar", 10.5, -4, ["drinks", "sunset_drinks"], { label: "Shed bar", icon: "🍸", w: 3.6, d: 1.2, seats: [[9.6, -2.8, Math.PI, "drink"], [11.4, -2.8, Math.PI, "drink"]], vendorSpot: [10.5, -5.3, 0] }),
+      T("cabana", -10.5, -4.5, ["vip_cabana", "lounge_network"], { label: "Blue-lit cabana", icon: "🍾", tint: 0x5b6cff, seats: [[-10.9, -4.6, Math.PI / 2, "sit"], [-10.1, -4.0, Math.PI / 2, "sit"]] }),
+      T("cabana", -10.5, 0.5, ["vip_cabana", "lounge_network"], { label: "Blue-lit cabana", icon: "🍾", tint: 0xb04bff, seats: [[-10.9, 0.4, Math.PI / 2, "sit"], [-10.1, 1.0, Math.PI / 2, "sit"]] }),
+      T("pillars", 9.5, 4.4, ["club_photos"], { label: "Light pillars", icon: "📸", w: 3.4, d: 3.4 }),
+      T("toilet", 11.6, 7.4, ["toilet"], { label: "Toilets", icon: "🚽" }),
     ] },
     mall: { w: 20, d: 14, floor: ["#f5f5f5", "#e0e0e0"], wall: "#e1f5fe", light: 0xffffff, objects: [
       T("shop", -7, -5, ["buy_gifts"], { label: "Gift shop", icon: "🎁", w: 4.5, vendorSpot: [-7, -5.8, 0] }),
@@ -416,7 +422,7 @@
     ] },
     // VIP Beach Club: open-air, day-to-night. Pool and daybeds by day, pergola
     // sundowners at dusk, DJ, moving lights and glowing LEDs at night.
-    beachclub: { w: 28, d: 20, open: true, floor: ["#c99b6d", "#bd8f62"], wall: "#ffffff", light: 0xfff1d6, stringLights: true, objects: [
+    beachclub: { w: 28, d: 20, open: true, setting: "beach", floor: ["#c99b6d", "#bd8f62"], wall: "#ffffff", light: 0xfff1d6, stringLights: true, objects: [
       T("pool", -2, 1.5, ["pool_swim"], { label: "Infinity pool", icon: "🏊🏾", w: 11, d: 5.5, seats: [[-5.5, 1.5, 0, "swim"], [-2.5, 0.6, 0.6, "swim"], [0.5, 2.4, -1.2, "swim"], [2.8, 1, 2.2, "swim"]] }),
       ...[-6, -3, 0, 3].map((x) => T("lounger", x, 5.6, ["daybed_lounge"], { label: "Sunbed", icon: "🏖️", seats: [[x, 5.7, Math.PI, "lie"]] })),
       T("cabana", -11, -2.5, ["vip_cabana", "daybed_lounge"], { label: "VIP cabana", icon: "🍾", seats: [[-11.4, -2.6, Math.PI / 2, "sit"], [-10.6, -2.0, Math.PI / 2, "sit"], [-11, -3.2, Math.PI / 2, "lie"]] }),
@@ -451,7 +457,7 @@
   // Venue atmosphere moodlets (no timer: they last while you're there).
   const ATMOSPHERE = {
     club: { emotion: "playful", w: 1, label: "Party Atmosphere", icon: "🪩", night: true },
-    lounge: { emotion: "flirty", w: 1, label: "Romantic Lighting", icon: "🌇" },
+    lounge: { emotion: "energized", w: 1, label: "Rooftop Energy", icon: "🌃" },
     hall: { emotion: "happy", w: 1, label: "Owambe Energy", icon: "🎊" },
     concert: { emotion: "energized", w: 1, label: "Crowd Energy", icon: "🎤" },
     beach: { emotion: "happy", w: 1, label: "Sea Breeze", icon: "🌊" },
