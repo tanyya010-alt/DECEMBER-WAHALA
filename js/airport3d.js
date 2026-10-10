@@ -374,6 +374,7 @@
       for (let k = 0; k < 3; k++) { const l = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.15, 0.4), this.bulbMat); l.position.set(-2.4 + k * 2.4, 6.65, 0.3); g.add(l); }
       g.position.set(x, 0, z); g.rotation.y = r;
       this.cityGroup.add(g);
+      (this.billboardObjs = this.billboardObjs || []).push(g);
     });
   };
   P.buildPlaceIcons = function () {

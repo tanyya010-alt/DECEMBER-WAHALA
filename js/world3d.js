@@ -166,6 +166,7 @@
 
       // Roads with lane markings.
       const asphalt = lam(0x4b5059);
+      this.roadMat = asphalt;
       const dashGeo = new THREE.BoxGeometry(1.6, 0.02, 0.18);
       const dashes = [];
       const crosses = (z1, z2) => lagos && Math.min(z1, z2) < G.water.band[0] && Math.max(z1, z2) > G.water.band[1];
@@ -279,6 +280,7 @@
         const pick = { kind: "place", id: "airport" };
         for (let i = n0; i < this.cityGroup.children.length; i++) { const m = this.cityGroup.children[i]; m.traverse((o) => { if (o.isMesh) o.userData.pick = pick; }); if (m.isMesh) this.pickables.push(m); else m.traverse((o) => { if (o.isMesh) this.pickables.push(o); }); }
         this.buildBillboards(); this.buildPlaceIcons();
+        if (this.buildExtras) this.buildExtras();
       }
       // Street lamps along the roads.
       const lampPos = [];
@@ -949,12 +951,13 @@
       this.onBlur = () => { this.keys = {}; };
       window.addEventListener("blur", this.onBlur);
       const cv = this.renderer.domElement;
-      cv.addEventListener("wheel", (e) => { e.preventDefault(); this.zoom = Math.max(0.5, Math.min(1.7, this.zoom * (e.deltaY > 0 ? 1.08 : 0.93))); }, { passive: false });
+      cv.addEventListener("wheel", (e) => { e.preventDefault(); if (this.overview) { this.zoomOverview(e.deltaY > 0 ? 1.1 : 0.91); return; } this.zoom = Math.max(0.5, Math.min(1.7, this.zoom * (e.deltaY > 0 ? 1.08 : 0.93))); }, { passive: false });
       cv.addEventListener("contextmenu", (e) => e.preventDefault());
       // Click or tap to walk and to open interaction menus; right-drag to turn the camera.
       let down = null, pinch = null;
       cv.addEventListener("pointerdown", (e) => { down = { x: e.clientX, y: e.clientY, t: performance.now(), b: e.button, yaw: this.camYawTarget || this.camYaw, id: e.pointerId }; });
       cv.addEventListener("pointermove", (e) => {
+        if (down && this.overview && e.pointerId === down.id && !pinch) { this.panOverview(e.clientX - (down.px ?? down.x), e.clientY - (down.py ?? down.y)); down.px = e.clientX; down.py = e.clientY; return; }
         if (down && down.b !== 0 && e.pointerId === down.id) { this.camYawTarget = down.yaw - (e.clientX - down.x) / 160; this.camYaw = this.camYawTarget; return; }
         if (!this.mobile && performance.now() - (this.hoverT || 0) > 70) { this.hoverT = performance.now(); this.hover = this.pickAt(e.clientX, e.clientY, true); cv.style.cursor = this.hover && this.hover.kind !== "ground" ? "pointer" : "default"; }
       });
@@ -973,7 +976,8 @@
         if (e.touches.length === 2 && pinch) {
           const [a, b] = e.touches;
           const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-          this.zoom = Math.max(0.5, Math.min(1.7, this.zoom * pinch.d / d)); pinch.d = d;
+          if (this.overview) this.zoomOverview(pinch.d / d); else this.zoom = Math.max(0.5, Math.min(1.7, this.zoom * pinch.d / d));
+          pinch.d = d;
           const ang = Math.atan2(b.clientY - a.clientY, b.clientX - a.clientX);
           this.camYaw = this.camYawTarget = pinch.yaw - (ang - pinch.ang);
         }
@@ -1090,7 +1094,7 @@
     update(dt, realDt) {
       this.time += realDt;
       const s = this.sim.s;
-      if (this.flight) { this.updateFlight(realDt); this.updateAirport(realDt); this.updateAmbient(realDt); this.hemi.intensity *= 0.62; this.sun.intensity *= 0.6; this.renderer.render(this.scene, this.camera); return; }
+      if (this.flight) { this.updateFlight(realDt); this.updateAirport(realDt); if (this.updateExtras) this.updateExtras(realDt); this.updateAmbient(realDt); this.hemi.intensity *= 0.62; this.sun.intensity *= 0.6; this.renderer.render(this.scene, this.camera); return; }
       this.syncRoom();
       if (s.ride === null && this.wasRiding && s.pos) { this.leaveInterior(); this.player.position.set(s.pos.x, 0, s.pos.z); this.snapCamera = true; }
       this.wasRiding = !!s.ride;
@@ -1099,7 +1103,7 @@
 
       // Movement: keys or joystick, or following a clicked route.
       let mx = 0, mz = 0, kx = 0, kz = 0;
-      const blocked = !!(s.ride || s.event || s.convo || s.over || this.frozen);
+      const blocked = !!(s.ride || s.event || s.convo || s.over || this.frozen || this.overview);
       if (!blocked) {
         if (this.keys.w || this.keys.arrowup) kz -= 1;
         if (this.keys.s || this.keys.arrowdown) kz += 1;
@@ -1205,6 +1209,8 @@
       if (this.snapCamera) { this.camera.position.copy(want); this.snapCamera = false; }
       else this.camera.position.lerp(want, Math.min(1, realDt * 4));
       this.camera.lookAt(look);
+      if (this.overview) this.updateOverviewCam(realDt);
+      if (this.updateExtras) this.updateExtras(realDt);
       if (this.interior && this.room) {
         const ox = off.x, oz = off.z, ol = Math.hypot(ox, oz) || 1;
         this.room.walls.forEach((m) => {
@@ -1544,7 +1550,7 @@
     // What the player can interact with right now (for the E key and the ✋ button).
     findTarget() {
       const s = this.sim.s;
-      if (s.ride || s.event || s.convo || s.over || (s.activity && s.activity.id === "sleep")) { this.target = null; return; }
+      if (this.overview || s.ride || s.event || s.convo || s.over || (s.activity && s.activity.id === "sleep")) { this.target = null; return; }
       const p = this.player.position;
       let best = null, bd = Infinity;
       const consider = (t, d) => { if (d < bd) { bd = d; best = t; } };
@@ -1595,14 +1601,15 @@
         for (const pl of Object.values(this.places)) {
           if (pl.remote) continue;
           const d = Math.hypot(pl.x - p.x, pl.z - p.z);
-          if (d > 55 || d < 9) continue;
+          if (this.overview ? !this.layers.names : d > 55 || d < 9) continue;
           const open = pl.kind === "building" && W.TYPES[pl.type].hours !== null ? (W.isOpen(pl.type, this.sim.s.t) ? "" : " · closed") : "";
           const cel = this.sim.celebHere(pl.id), cd = cel && this.sim.celebDef(cel.id);
           show("pl:" + pl.id, pl.x, (pl.h || 2) + 3.2, pl.z, `${pl.icon} ${escapeHtml(pl.id === "home" ? "Your Flat" : pl.name)}<i>${open}</i>${cd ? `<i class="wl-star">⭐ ${escapeHtml(cd.name)} is here</i>` : ""}`, "wl-place");
         }
       }
+      if (this.overview) (this.ovLabels || []).forEach((l, k) => { if (this.layers[l.layer] !== false) show("ov:" + k, l.x, 4, l.z, escapeHtml(l.text), "wl-place wl-ov"); });
       for (const [id, rec] of this.people) {
-        if (!rec.model.visible) continue;
+        if (!rec.model.visible || this.overview) continue;
         const d = Math.hypot(rec.model.position.x - p.x, rec.model.position.z - p.z);
         const st = this.sim.whoState(id);
         const known = rec.kind === "player" || (st && st.met) || (this.hover && this.hover.id === id);

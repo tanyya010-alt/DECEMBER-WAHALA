@@ -428,7 +428,7 @@
     app.rideWas = !!sim.s.ride;
     runQueue();
     app.hudT += dt; app.saveT += dt; app.pollT += dt;
-    if (app.hudT > 0.2) { app.hudT = 0; renderHud(); }
+    if (app.hudT > 0.2) { app.hudT = 0; renderHud(); if (app.world.overview && Math.random() < 0.05) renderOvBar(); }
     if (app.saveT > 15) { app.saveT = 0; persist(); }
     if (app.pollT > 20 && app.online && app.user) { app.pollT = 0; refreshCity(sim.s.city); pollInbox(); }
     if (sim.s.over) { persist(true); show("screen-end"); renderEnd(); }
@@ -476,7 +476,38 @@
   // ------------------------------------------------------------------ interaction queue
   // Like The Sims: what you pick goes in a queue; your Sim walks over and does
   // each thing in turn. Tapping a queued item cancels it.
+  // City view: the bird's-eye 3D map with layers you can toggle.
+  function setCityView(on) {
+    const w = app.world;
+    if (!w || !w.setOverview) return;
+    if (on && w.interior) { toast("Step outside first to see the whole city."); return; }
+    w.setOverview(on);
+    if (on) { closeSheet(); closePie(); }
+    renderOvBar();
+    document.body.classList.toggle("cityview", !!w.overview);
+  }
+  function renderOvBar() {
+    const w = app.world, el = $("ov-bar");
+    if (!w || !w.overview) { el.hidden = true; el.innerHTML = ""; return; }
+    el.hidden = false;
+    const sim = app.sim, s = sim.s, L = w.layers;
+    const tl = sim.trafficLevel(), dot = ["#20b46e", "#f2b632", "#f57c00", "#e5484d"][tl];
+    const zp = w.player.position, zn = W.zoneAt(s.city, zp.x, zp.z);
+    const chip = (k, icon, label) => `<button class="ov-chip${L[k] ? " on" : ""}" data-layer="${k}">${icon} ${label}</button>`;
+    el.innerHTML = `<div class="ov-row">${chip("goslow", `<i class="dot" style="background:${dot}"></i>`, "Go-slow")}${chip("billboards", "📢", "Billboards")}${chip("neighbours", "🏘️", "Neighbours")}${chip("sea", "🌊", "Sea")}${chip("gov", "🏛️", "Gov")}<button class="ov-chip walk" data-ovexit>🚶🏾 Walk ${esc(zn.name.split(" & ")[0])}</button></div>`
+      + `<div class="ov-row">${[["lagos", "🌆", "Lagos"], ["ph", "🌊", "Port Harcourt"], ["abuja", "🏛️", "Abuja"]].map(([id, i, n]) => `<button class="ov-chip city${s.city === id ? " sel" : ""}" data-ovcity="${id}">${i} ${n}</button>`).join("")}${chip("names", "🏷️", "Names")}</div>`
+      + `<p class="ov-tip">🚦 Traffic: <b>${sim.trafficLabel()}</b> · drag or WASD to pan · scroll or pinch to zoom · tap a place to go there</p>`;
+  }
+  window.addEventListener("keydown", (e) => { if (e.key === "Escape" && app.world && app.world.overview) setCityView(false); });
+  $("ov-bar").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    const w = app.world, d = b.dataset;
+    if (d.layer) { w.setLayer(d.layer, !w.layers[d.layer]); renderOvBar(); return; }
+    if (d.ovexit !== undefined) { setCityView(false); return; }
+    if (d.ovcity) { if (d.ovcity !== app.sim.s.city) toast(`✈️ ${d.ovcity === "ph" ? "Port Harcourt" : d.ovcity === "abuja" ? "Abuja" : "Lagos"} is a flight away. Board one at the airport's Departures.`); return; }
+  });
   function enqueue(item) {
+    if (app.world && app.world.overview) setCityView(false);
     if (app.queue.length >= 6) { toast("Your queue is full. Let your Sim finish first."); return; }
     app.queue.push(item);
     runQueue();
@@ -1132,7 +1163,7 @@
     const cel = s.celeb && s.celeb.until > s.t ? s.celeb : null, cp = cel && sim.places[cel.place];
     const mePos = app.world && !app.world.interior ? { x: app.world.player.position.x, z: app.world.player.position.z } : pos;
     const hereZone = W.zoneAt(s.city, mePos.x, mePos.z).id;
-    let html = `<button class="btn sm map-zoom" data-mapzoom>${app.mapZoom ? "🔎 Fit map" : "🔍 Zoom in"}</button><div class="map-wrap${app.mapZoom ? " zoom" : ""}">${minimap(s.city, { me: mePos, sel: app.mapSel, here: s.place, zone: hereZone, people: pp, celeb: cp ? { x: cp.door.x, z: cp.door.z, label: sim.celebDef(cel.id).name } : null })}</div>`;
+    let html = `<div class="map-btns"><button class="btn sm primary" data-cityview>🛰️ City view</button><button class="btn sm map-zoom" data-mapzoom>${app.mapZoom ? "🔎 Fit map" : "🔍 Zoom in"}</button></div><div class="map-wrap${app.mapZoom ? " zoom" : ""}">${minimap(s.city, { me: mePos, sel: app.mapSel, here: s.place, zone: hereZone, people: pp, celeb: cp ? { x: cp.door.x, z: cp.door.z, label: sim.celebDef(cel.id).name } : null })}</div>`;
     html += `<p class="muted-sm" style="margin:6px 0 0">🚦 Traffic now: <b>${sim.trafficLabel()}</b> · 🟡 friends you've met${cel ? ` · ⭐ ${esc(sim.celebDef(cel.id).name)} at ${esc(cp.name)}` : ""}</p>`;
     const remote = ["airport"];
     html += `<div class="chips small-chips">${remote.map((id) => `<button data-mapsel="${id}" class="${app.mapSel === id ? "sel" : ""}">${sim.places[id].icon} ${esc(sim.places[id].name)}</button>`).join("")}</div>`;
@@ -1388,6 +1419,7 @@
     const b = e.target.closest("[data-panel]");
     if (!b || b.disabled) return;
     const id = b.dataset.panel;
+    if (!id && app.world && app.world.overview) setCityView(false);
     if (!id || app.panel === id) closeSheet(); else { if (id === "phone") app.phoneApp = null; openPanel(id); }
     closePie();
     renderHud(true);
@@ -1453,6 +1485,7 @@
     if (d.ability !== undefined) { sim.useAbility(); renderHud(true); return; }
     if (d.wear) { sim.wear(d.wear); refreshPanel(); return; }
     if (d.use) { sim.equipItem(d.use); refreshPanel(); renderHud(true); return; }
+    if (d.cityview !== undefined) { setCityView(true); return; }
     if (d.mapzoom !== undefined) { app.mapZoom = !app.mapZoom; refreshPanel(); return; }
     if (d.place || d.mapsel) { app.mapSel = d.place || d.mapsel; refreshPanel(); return; }
     if (d.ride) {

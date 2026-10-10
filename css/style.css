@@ -998,3 +998,21 @@ body.flying #screen-game .hud, body.flying .world-labels { display: none !import
 .fl-summary { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(420px, calc(100vw - 32px)); background: #fff; color: var(--ink); border-radius: 22px; padding: 22px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,.3); }
 .fl-summary h3 { font-family: var(--display); margin: 0 0 8px; }
 .fl-summary p { color: var(--muted); margin: 0 0 14px; }
+
+/* ---------- City view ---------- */
+.ov-bar[hidden] { display: none !important; }
+.ov-bar { position: absolute; top: calc(env(safe-area-inset-top, 0px) + 74px); left: 8px; right: 8px; display: grid; gap: 8px; justify-items: center; z-index: 3; pointer-events: none; }
+.ov-bar > * { pointer-events: auto; }
+.ov-row { display: flex; gap: 4px; padding: 6px; background: rgba(255,255,255,.95); border-radius: 999px; box-shadow: var(--shadow); overflow-x: auto; max-width: 100%; scrollbar-width: none; }
+.ov-chip { flex: none; border: 0; background: transparent; padding: 8px 14px; border-radius: 999px; font: 700 .95rem var(--body); color: var(--muted); cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+.ov-chip.on { color: var(--ink); }
+.ov-chip:not(.on):not(.city):not(.walk) { opacity: .5; text-decoration: line-through; }
+.ov-chip.city.sel { background: var(--sky-ink); color: #fff; }
+.ov-chip.walk { color: var(--ink); }
+.ov-chip .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.ov-tip { margin: 0; font-size: .74rem; font-weight: 700; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.6); text-align: center; }
+.wl-ov { background: rgba(29,36,51,.85); color: #fff; letter-spacing: .08em; font-size: .78rem; }
+body.cityview .hud-left, body.cityview .hud-me, body.cityview #h-ticker, body.cityview #h-next { display: none !important; }
+.map-btns { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 8px; }
+.map-btns .map-zoom { margin: 0; }
+@media (max-width: 560px) { .ov-bar { top: calc(env(safe-area-inset-top, 0px) + 60px); right: 76px; } .ov-chip { padding: 6px 10px; font-size: .8rem; } }
