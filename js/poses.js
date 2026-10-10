@@ -94,6 +94,15 @@
         if (el) { el.rotation.x = -0.6 - g1 * 0.6; er.rotation.x = -0.6 - g2 * 0.7; }
         break;
       }
+      case "swim": {
+        // Chest-deep in the pool: easy breaststroke arms, legs kicking below.
+        const st = (Math.sin(ph * 0.9) + 1) / 2;
+        if (al) { al.rotation.x = -1.3 - st * 0.4; ar.rotation.x = -1.3 - st * 0.4; al.rotation.z = -0.3 - st * 0.6; ar.rotation.z = 0.3 + st * 0.6; }
+        if (el) { el.rotation.x = -0.5 + st * 0.4; er.rotation.x = -0.5 + st * 0.4; }
+        if (ll) { ll.rotation.x = Math.sin(ph) * 0.3; lr.rotation.x = -Math.sin(ph) * 0.3; }
+        y = -0.95 + Math.sin(ph * 0.9) * 0.04;
+        break;
+      }
       case "wave":
         if (ar) { ar.rotation.x = -0.4; ar.rotation.z = 2.6; er.rotation.x = -0.4 + Math.sin(ph * 3) * 0.4; }
         break;

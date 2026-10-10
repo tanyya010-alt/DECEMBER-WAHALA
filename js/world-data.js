@@ -49,6 +49,7 @@
     beach: { icon: "🏖️", kind: "open", hours: [hm("08:00"), hm("19:00")], actions: ["chill", "beach_party", "picnic", "beach_photos"] },
     photo: { icon: "📸", kind: "open", hours: null, actions: ["photoshoot", "collab"] },
     airport: { icon: "✈️", kind: "remote", hours: null, actions: ["pickup", "watch_arrivals"] },
+    beachclub: { icon: "🏝️", kind: "building", h: 4, color: "#fbf7ef", roof: "#d8a93b", hours: [hm("10:00"), hm("27:00")], actions: ["pool_swim", "daybed_lounge", "beach_brunch", "sundowner", "vip_cabana", "beachclub_party"] },
   };
 
   // Where each place sits: [column, row, doorSide, xOffset, width].
@@ -71,7 +72,7 @@
       bdc: "Mallam Musa BDC", mall: "Palms Mall", fashion: "Àṣà Fashion House", cafe: "Bean & Breeze Café",
       restaurant: "Island Grill", fastfood: "Chop Republic", suya: "Mallam Suya Spot", club: "Club Eko",
       concert: "Eko Atlantic Festival Grounds", lounge: "Sky Rooftop Lounge", beach: "Oniru Beach",
-      photo: "The Detty Wall", airport: "Murtala Muhammed Airport",
+      photo: "The Detty Wall", airport: "Murtala Muhammed Airport", beachclub: "Eko Shores Beach Club",
     },
     abuja: {
       family: "Family House", home: "Your Flat", mamaput: "Mama Cass Kitchen", salon: "Wuse Cuts & Curls", gym: "Capital Fitness",
@@ -80,7 +81,7 @@
       bdc: "Zone 4 BDC", mall: "Jabi Lake Mall", fashion: "Àṣà Fashion House", cafe: "Bean & Breeze Café",
       restaurant: "Wuse 2 Grill", fastfood: "Chop Republic", suya: "Area 11 Suya", club: "Club Maitama",
       concert: "Eagle Square Concert Grounds", lounge: "Sky Lounge Maitama", beach: "Jabi Lakeside",
-      photo: "Millennium Park Arch", airport: "Nnamdi Azikiwe Airport",
+      photo: "Millennium Park Arch", airport: "Nnamdi Azikiwe Airport", beachclub: "Jabi Shores Lakeside Club",
     },
   };
 
@@ -102,6 +103,7 @@
     }
     out.beach = { id: "beach", type: "beach", name: NAMES[city].beach, icon: TYPES.beach.icon, kind: "open", x: -8, z: 56, w: 40, d: 10, h: 0, side: "N", door: { x: -8, z: 54 }, spot: { x: -8, z: 55 } };
     out.photo = { id: "photo", type: "photo", name: NAMES[city].photo, icon: TYPES.photo.icon, kind: "open", x: 40, z: 56, w: 12, d: 8, h: 0, side: "N", door: { x: 40, z: 54 }, spot: { x: 40, z: 55 } };
+    out.beachclub = { id: "beachclub", type: "beachclub", name: NAMES[city].beachclub, icon: TYPES.beachclub.icon, kind: "building", x: 23, z: 56.5, w: 18, d: 9, h: 4, side: "N", door: { x: 23, z: 51.4 }, spot: { x: 23, z: 50.2 } };
     out.airport = { id: "airport", type: "airport", name: NAMES[city].airport, icon: TYPES.airport.icon, kind: "remote", x: -66, z: -50, w: 0, d: 0, h: 0, side: "N", door: { x: -66, z: -50 }, spot: { x: -66, z: -50 }, remote: true };
     return out;
   }
@@ -202,6 +204,13 @@
     event_setup: { name: "Event setup gig", icon: "🪑", mins: 240, fx: { energy: -22 }, gig: 30000, gigType: "setup" },
     // Hotel
     book_night: { name: "Book a room for tonight", icon: "🛏️", mins: 10, cost: 85000, special: "hotelnight" },
+    // VIP Beach Club: day-to-night zones.
+    pool_swim: { name: "Swim in the infinity pool", icon: "🏊🏾", mins: 45, fx: { vibes: 14, energy: -6, hygiene: 10 }, clout: 1 },
+    daybed_lounge: { name: "Lounge on a daybed", icon: "🏖️", mins: 60, cost: 15000, fx: { energy: 10, vibes: 10 }, window: [10, 19] },
+    beach_brunch: { name: "Bottomless brunch", icon: "🥂", mins: 90, cost: 35000, fx: { belle: 40, vibes: 14, social: 10 }, food: true, clout: 2, window: [10, 16] },
+    sundowner: { name: "Sundowner cocktails at the pergola", icon: "🌅", mins: 60, cost: 18000, fx: { vibes: 16, social: 10 }, clout: 2, window: [16, 21], special: "datecheck" },
+    vip_cabana: { name: "Book a VIP cabana (bottle service)", icon: "🍾", mins: 180, cost: 250000, fx: { vibes: 38, social: 20, energy: -10 }, clout: 14, conn: 6, big: true, premium: true, special: "vip" },
+    beachclub_party: { name: "Party at the DJ set", icon: "🎧", mins: 180, cost: 20000, fx: { vibes: 34, energy: -18 }, clout: 6, big: true, dress: "club", window: [21, 3], special: "party" },
     pool_day: { name: "Pool day", icon: "🏊🏾", mins: 120, cost: 15000, fx: { vibes: 18, energy: 6 }, clout: 3 },
     lobby_network: { name: "Network in the lobby", icon: "🧳", mins: 45, conn: 5, special: "meet" },
     rent_car: { name: "Rent a car for the day", icon: "🚙", mins: 20, cost: 80000, special: "rentcar" },

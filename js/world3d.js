@@ -244,7 +244,8 @@
       // Trees around the blocks.
       const trees = [];
       for (const x of G.cols) for (const z of G.rows) { trees.push([x - 9.6, z - 6.6], [x + 9.6, z - 6.6]); }
-      for (let x = -64; x <= 64; x += 9) trees.push([x, lagos ? 59 : 60]);
+      const inClub = (x, z) => { const bc = this.places.beachclub; return bc && Math.abs(x - bc.x) < bc.w / 2 + 1.5 && Math.abs(z - bc.z) < bc.d / 2 + 1.5; };
+      for (let x = -64; x <= 64; x += 9) if (!inClub(x, lagos ? 59 : 60)) trees.push([x, lagos ? 59 : 60]);
       this.addTrees(trees);
       this.buildDecorations();
     }
@@ -271,8 +272,37 @@
       this.collider(x, z, 0.5, 0.5);
     }
 
+    // The VIP beach club from outside: a white pavilion on the sand.
+    buildBeachClub(p) {
+      const x0 = p.x, z0 = p.z, w = p.w, d = p.d, front = z0 - d / 2;
+      this.add(box(w, 0.3, d, lam(0xc89a68)), x0, 0.15, z0);
+      const glass = new THREE.MeshLambertMaterial({ color: 0xcfe8ff, transparent: true, opacity: 0.4 });
+      [[0, -d / 2, w, 0.1], [0, d / 2, w, 0.1], [-w / 2, 0, 0.1, d], [w / 2, 0, 0.1, d]].forEach(([dx, dz, ww, dd]) => { this.add(box(ww, 1.0, dd, glass), x0 + dx, 0.8, z0 + dz); this.add(box(ww + 0.05, 0.06, dd + 0.05, lam(0xd8a93b)), x0 + dx, 1.32, z0 + dz); });
+      this.collider(x0, z0, w, d);
+      // Glowing pool inside.
+      this.add(box(8, 0.05, 3.2, new THREE.MeshBasicMaterial({ color: 0x2bc4e8 })), x0 - 1, 0.33, z0 + 0.8);
+      // Cabana canopies.
+      [[-6.5, -1.8], [-6.5, 2.4], [6.8, 2.4]].forEach(([dx, dz]) => {
+        [[-1.1, -1.1], [1.1, -1.1], [-1.1, 1.1], [1.1, 1.1]].forEach(([px, pz]) => this.add(box(0.1, 2.3, 0.1, lam(0xffffff)), x0 + dx + px, 1.45, z0 + dz + pz));
+        this.add(box(2.4, 0.12, 2.4, lam(0xffffff)), x0 + dx, 2.6, z0 + dz);
+      });
+      // Entrance arch with the sign and gold lanterns.
+      [-1.6, 1.6].forEach((dx) => this.add(box(0.3, 3.6, 0.3, lam(0xffffff)), x0 + dx, 1.8, front));
+      this.add(box(3.6, 0.35, 0.3, lam(0xffffff)), x0, 3.7, front);
+      const s = this.add(new THREE.Mesh(new THREE.PlaneGeometry(7, 1.75), new THREE.MeshBasicMaterial({ map: signTexture(p.icon, p.name), transparent: true })), x0, 4.6, front - 0.05);
+      s.rotation.y = Math.PI;
+      const neon = new THREE.MeshBasicMaterial({ color: 0xffd27a }); this.neonMats.push(neon);
+      this.add(box(3.3, 0.06, 0.06, neon), x0, 3.5, front - 0.17);
+      [-2.4, 2.4].forEach((dx) => { this.add(box(0.4, 0.8, 0.4, lam(0xd8a93b)), x0 + dx, 0.4, front - 0.6); this.add(new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 5), this.bulbMat), x0 + dx, 0.5, front - 0.6); });
+      // Palms at the corners and string lights between poles.
+      [[-w / 2 - 0.8, -d / 2 - 0.6], [w / 2 + 0.8, -d / 2 - 0.6], [-w / 2 - 0.8, d / 2 + 0.6], [w / 2 + 0.8, d / 2 + 0.6]].forEach(([dx, dz]) => this.palm(x0 + dx, z0 + dz));
+      [-w / 2 + 0.3, w / 2 - 0.3].forEach((dx) => this.add(box(0.1, 3.6, 0.1, lam(0x6d4c41)), x0 + dx, 1.8, z0));
+      for (let i = 0; i <= 18; i++) this.add(new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 4), this.bulbMat), x0 - w / 2 + 0.3 + i * (w - 0.6) / 18, 3.5 - Math.sin((i / 18) * Math.PI) * 0.6, z0);
+    }
+
     buildPlace(p) {
       const T = W.TYPES[p.type];
+      if (p.type === "beachclub") { this.buildBeachClub(p); return; }
       const front = p.z + (p.side === "S" ? 1 : -1) * (p.d / 2);
       const dir = p.side === "S" ? 1 : -1;
       const sign = (y, w = Math.min(p.w - 1, 9)) => {
@@ -424,7 +454,7 @@
           this.add(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.5, 4), lam(0xffffff)), x, 1.25, z);
           this.add(box(0.8, 0.2, 1.9, lam(0xffffff)), x + 1, 0.3, z + 0.4);
         }
-        for (let i = 0; i < 7; i++) this.palm(-58 + i * 19, 52.5 + (i % 2) * 1.4);
+        for (let i = 0; i < 7; i++) { const x = -58 + i * 19, bc = this.places.beachclub; if (bc && Math.abs(x - bc.x) < bc.w / 2 + 1.5) continue; this.palm(x, 52.5 + (i % 2) * 1.4); }
         signPole(p.x - 21, 52);
       } else if (t === "photo") {
         const wall = this.add(new THREE.Mesh(new THREE.BoxGeometry(9, 4.5, 0.4), [lam(0xffffff), lam(0xffffff), lam(0xffffff), lam(0xffffff), new THREE.MeshBasicMaterial({ map: muralTexture() }), lam(0xffffff)]), p.x, 2.25, p.z + 1);
@@ -943,7 +973,8 @@
           m.scale.y += (sc - m.scale.y) * Math.min(1, realDt * 8);
           m.position.y = (wl.h * m.scale.y) / 2;
         });
-        Rooms.animate(this.room, this.time);
+        const c = this.sim.clock(), hr = c.hh + c.mm / 60;
+        Rooms.animate(this.room, this.time, this.room.open ? 1 - daylight(hr) : 1);
       }
 
       this.updatePeople(realDt);
@@ -1188,14 +1219,15 @@
       const s = this.sim.s;
       const c = this.sim.clock();
       const h = c.hh + c.mm / 60;
-      const sky = this.interior ? new THREE.Color(0x1d1a24) : skyAt(h);
+      const openAir = this.interior && this.room && this.room.open;
+      const sky = this.interior && !openAir ? new THREE.Color(0x1d1a24) : skyAt(h);
       this.scene.background = sky;
       this.scene.fog.color = sky;
-      const day = this.interior ? 1 : daylight(h);
+      const day = this.interior && !openAir ? 1 : daylight(h);
       // Night keeps a cool moonlit fill so the streets stay readable.
-      this.hemi.intensity = this.interior ? (this.room && this.room.dark ? 0.32 : 0.78) : 0.62 + day * 0.33;
+      this.hemi.intensity = this.interior && !openAir ? (this.room && this.room.dark ? 0.32 : 0.78) : openAir ? 0.42 + day * 0.5 : 0.62 + day * 0.33;
       this.hemi.color.setRGB(lerp(0.62, 1, day), lerp(0.7, 1, day), lerp(1, 1, day));
-      this.sun.intensity = this.interior ? (this.room && this.room.dark ? 0.08 : 0.42) : 0.22 + day * 0.58;
+      this.sun.intensity = this.interior && !openAir ? (this.room && this.room.dark ? 0.08 : 0.42) : openAir ? 0.1 + day * 0.7 : 0.22 + day * 0.58;
       this.sun.color.setRGB(lerp(0.6, 1, day), lerp(0.68, 0.97, day), lerp(0.95, 0.92, day));
       const pp = this.player.position;
       this.sun.position.set(pp.x + Math.cos((h / 24) * Math.PI * 2 - Math.PI / 2) * 50, 45 + day * 25, pp.z + 35);

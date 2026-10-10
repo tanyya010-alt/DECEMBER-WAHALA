@@ -34,7 +34,13 @@
       return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
     };
   }
-  const hash = (...n) => { let h = 2166136261; for (const v of n) { h ^= v; h = Math.imul(h, 16777619); } return (h >>> 0) / 4294967296; };
+  const hash = (...n) => {
+    let h = 2166136261;
+    for (const v of n) { h ^= v; h = Math.imul(h, 16777619); }
+    // Final avalanche so small, similar inputs still spread evenly.
+    h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b); h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 16;
+    return (h >>> 0) / 4294967296;
+  };
 
   function clock(t) {
     const day = Math.floor(t / DAY) + 1;
@@ -610,6 +616,12 @@
         return "Closed now";
       }
       if (a.event && !evs.includes(a.event) && !(a.event === "concert" && this.events(this.day() - 1).includes("concert") && this.clock().hh < 2)) return a.event === "owambe" ? "Only on owambe Saturdays" : a.event === "beachparty" ? "Sundays from the 13th" : "Only on concert days";
+      if (a.window) {
+        const h = this.clock().hh, [w0, w1] = a.window;
+        const ok = w0 < w1 ? h >= w0 && h < w1 : h >= w0 || h < w1;
+        const lab = (x) => `${((x + 11) % 12) + 1}${x < 12 || x === 24 ? "am" : "pm"}`;
+        if (!ok) return `Only ${lab(w0)}–${lab(w1)}`;
+      }
       if (a.personaOnly && !a.personaOnly.includes(s.persona)) return "Not for your persona";
       if (a.item && !(s.inventory[a.item] > 0)) return `Need a ${W.ITEMS[a.item].name}`;
       if (a.premium && !["ijgb", "pikin"].includes(s.persona) && s.clout < 100 && !(s.inventory.vip_band > 0)) return "Big money only (or 100 clout)";

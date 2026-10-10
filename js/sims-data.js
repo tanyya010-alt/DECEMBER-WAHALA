@@ -93,6 +93,7 @@
     service: "blessed", pray: "blessed", carol: "blessed",
     salon_gossip: "gossip", owambe_gossip: "gossip", gist_vendor: "gossip",
     new_hair: "complimented", start_drama: "argued", sunset_drinks: "flirted", host: "partied",
+    pool_swim: "fresh", daybed_lounge: "entertained", beach_brunch: "great_food", sundowner: "flirted", vip_cabana: "big_spender", beachclub_party: "partied",
   };
 
   // What each emotion does. soc: social success; cats: per-category bonus;
@@ -118,6 +119,9 @@
   function crowdWeights(c, events) {
     const h = c.hh, wd = c.wd, w = {};
     const add = (t, n) => { w[t] = (w[t] || 0) + n; };
+    if (h >= 21 || h < 3) add("beachclub", 6);
+    else if (h >= 11 && (wd === 0 || wd === 6 || events.includes("beachparty"))) add("beachclub", 5);
+    else if (h >= 11) add("beachclub", 3.5);
     if (h >= 22 || h < 4) { add("club", 6); add("lounge", h < 2 || h >= 22 ? 3 : 0); add("suya", 3); if (events.includes("concert")) add("concert", 6); }
     else if (h >= 17) { add("lounge", 3); add("suya", h >= 18 ? 3 : 0); add("restaurant", 3); add("fastfood", 2); add("mall", 2); add("beach", h < 19 ? 2 : 0); add("photo", 1); if (events.includes("concert")) add("concert", 6); if (events.includes("owambe")) add("hall", 5); }
     else if (h >= 7) {
@@ -162,7 +166,7 @@
   const SKILL_OF = {
     cook: "cooking", takeaway_jollof: null,
     party: "dancing", dance: "dancing", owambe_attend: "dancing", beach_party: "dancing", dance_home: "dancing", concert: "dancing",
-    workout: "fitness", chores: "fitness",
+    workout: "fitness", chores: "fitness", pool_swim: "fitness", beachclub_party: "dancing",
     post_home: "photography", club_photos: "photography", beach_photos: "photography", photoshoot: "photography", collab: "photography",
     work_shift: "hustle", sell_phones: "hustle", delivery: "hustle", small_chops: "hustle", conductor_gig: "hustle", event_setup: "hustle", concert_photo_gig: "photography", resell_tickets: "hustle", broker: "hustle", remote_work: "hustle", laptop_work: "hustle",
     gist_vendor: "charisma", salon_gossip: "charisma", owambe_network: "charisma", club_network: "charisma", lounge_network: "charisma", lobby_network: "charisma", gym_network: "charisma", practice_speech: "charisma", restaurant_meet: "charisma", cafe_meet: "charisma", mall_meet: "charisma", office_gist: "charisma",
@@ -193,6 +197,7 @@
     post_home: "phone", club_photos: "phone", beach_photos: "phone", photoshoot: "phone", collab: "phone",
     pray: "pray", carol: "sing", party: "dance", dance: "dance", owambe_attend: "dance", beach_party: "dance", concert: "dance",
     workout: "workout", chores: "workout", cook: "cook", takeaway_jollof: "stand",
+    pool_swim: "swim", daybed_lounge: "lie", beach_brunch: "eat", sundowner: "drink", vip_cabana: "sit", beachclub_party: "dance",
   };
 
   // ------------------------------------------------------------ social interactions
@@ -409,6 +414,22 @@
     bdc: { w: 10, d: 8, floor: ["#e8f5e9", "#c8e6c9"], wall: "#c8e6c9", light: 0xffffff, objects: [
       T("counter", 0, -2.8, ["bdc_sell", "bdc_buy"], { label: "Mallam Musa's counter", icon: "💱", w: 6, vendorSpot: [0, -3.6, 0] }),
     ] },
+    // VIP Beach Club: open-air, day-to-night. Pool and daybeds by day, pergola
+    // sundowners at dusk, DJ, moving lights and glowing LEDs at night.
+    beachclub: { w: 28, d: 20, open: true, floor: ["#c99b6d", "#bd8f62"], wall: "#ffffff", light: 0xfff1d6, stringLights: true, objects: [
+      T("pool", -2, 1.5, ["pool_swim"], { label: "Infinity pool", icon: "🏊🏾", w: 11, d: 5.5, seats: [[-5.5, 1.5, 0, "swim"], [-2.5, 0.6, 0.6, "swim"], [0.5, 2.4, -1.2, "swim"], [2.8, 1, 2.2, "swim"]] }),
+      ...[-6, -3, 0, 3].map((x) => T("lounger", x, 5.6, ["daybed_lounge"], { label: "Sunbed", icon: "🏖️", seats: [[x, 5.7, Math.PI, "lie"]] })),
+      T("cabana", -11, -2.5, ["vip_cabana", "daybed_lounge"], { label: "VIP cabana", icon: "🍾", seats: [[-11.4, -2.6, Math.PI / 2, "sit"], [-10.6, -2.0, Math.PI / 2, "sit"], [-11, -3.2, Math.PI / 2, "lie"]] }),
+      T("cabana", -11, 4, ["vip_cabana", "daybed_lounge"], { label: "VIP cabana", icon: "🍾", seats: [[-11.4, 3.9, Math.PI / 2, "sit"], [-10.6, 4.5, Math.PI / 2, "sit"]] }),
+      T("cabana", 11.5, 4.5, ["vip_cabana", "daybed_lounge"], { label: "VIP cabana", icon: "🍾", seats: [[11.9, 4.4, -Math.PI / 2, "sit"], [11.1, 5.0, -Math.PI / 2, "sit"]] }),
+      T("pergola", 10, -4.5, ["sundowner", "sit_chill", "lounge_network"], { label: "Pergola lounge", icon: "🌅", seats: [[8.3, -5.6, 0, "sit"], [9.6, -5.6, 0, "sit"], [10.9, -5.6, 0, "sit"], [12.1, -4.4, -Math.PI / 2, "sit"]] }),
+      T("glowbar", 0, -8, ["drinks", "sundowner", "beach_brunch"], { label: "Beach bar", icon: "🍹", w: 7, d: 1.3, seats: [[-2.4, -6.7, Math.PI, "drink"], [0, -6.7, Math.PI, "drink"], [2.4, -6.7, Math.PI, "drink"]], vendorSpot: [0, -9.1, 0] }),
+      T("dj", -7, -8, ["request_song"], { label: "DJ booth", icon: "🎧", vendorSpot: [-7, -8.9, 0] }),
+      T("dancedeck", -5.5, -4.6, ["beachclub_party", "dance"], { label: "Dance deck", icon: "💃🏾", w: 7, d: 3.4, seats: [[-7.5, -5, 0, "dance"], [-5.6, -4.4, 0, "dance"], [-3.7, -5, 0, "dance"], [-6.6, -3.8, 0, "dance"], [-4.4, -3.6, 0, "dance"]] }),
+      tableSet(5.5, 1.5, ["beach_brunch"], "Brunch table"),
+      T("ringlight", -12.5, -7.8, [], { label: "Light sculpture" }),
+      T("shower", 12.5, -8.5, ["shower", "toilet"], { label: "Showers & toilets", icon: "🚿" }),
+    ] },
     hustle: { w: 16, d: 12, floor: ["#fff8e1", "#ffecb3"], wall: "#ffe082", light: 0xffffff, objects: [
       T("counter", -4.5, -3.8, ["sell_phones"], { label: "Phone stall", icon: "📦", w: 5, vendorSpot: [-4.5, -4.6, 0] }),
       T("counter", 3, -3.8, ["merch_stock"], { label: "Merch printer", icon: "👕", w: 4 }),
@@ -438,6 +459,7 @@
     office: { emotion: "focused", w: 1, label: "Work Mode", icon: "💼" },
     gym: { emotion: "energized", w: 1, label: "Gym Energy", icon: "🏋🏾" },
     photo: { emotion: "inspired", w: 1, label: "Picture Perfect", icon: "📸" },
+    beachclub: { emotion: "playful", w: 1, label: "Beach Club Vibes", icon: "🏝️" },
   };
 
   const SIMS = { NEEDS, EMOTIONS, MOODLETS, needMoodlets, SKILLS, SKILL_OF, skillLevel, EXTRA_ACTIONS, POSES, SOCIALS, SOCIAL_CATS, REPLIES, FURNITURE, START_HOME, INTERIORS, OUTDOOR, ACTION_MOODLETS, EMO_FX, crowdWeights, ATMOSPHERE };
