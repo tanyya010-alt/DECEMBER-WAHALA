@@ -249,6 +249,24 @@
         }
       }
 
+      // Zone colours on the ground: glowing kerbs around every block, like the map.
+      this.zoneMats = {};
+      for (const x of G.cols) for (const z of G.rows) {
+        const zn = W.zoneAt(this.city, x, z);
+        const m = this.zoneMats[zn.id] || (this.zoneMats[zn.id] = new THREE.MeshBasicMaterial({ color: new THREE.Color(zn.color) }));
+        const hw = G.blockW / 2 + 0.75, hd = G.blockD / 2 + 0.75;
+        this.add(box(G.blockW + 1.5, 0.14, 0.18, m), x, 0.14, z - hd); this.add(box(G.blockW + 1.5, 0.14, 0.18, m), x, 0.14, z + hd);
+        this.add(box(0.18, 0.14, G.blockD + 1.5, m), x - hw, 0.14, z); this.add(box(0.18, 0.14, G.blockD + 1.5, m), x + hw, 0.14, z);
+      }
+      // Welcome arches where the bridges land on each side.
+      G.water.bridges.forEach((bx) => [[G.water.band[0] - 1.5, true], [G.water.band[1] + 1.5, false]].forEach(([bz, north]) => {
+        const zn = W.zoneAt(this.city, bx - 1, north ? -12 : 12);
+        const m = this.zoneMats[zn.id] || new THREE.MeshBasicMaterial({ color: new THREE.Color(zn.color) });
+        [-3.6, 3.6].forEach((dx) => this.add(box(0.3, 5, 0.3, m), bx + dx, 2.5, bz));
+        this.add(box(7.5, 0.3, 0.3, m), bx, 5, bz);
+        const sg = this.add(new THREE.Mesh(new THREE.PlaneGeometry(7, 1.75), new THREE.MeshBasicMaterial({ map: signTexture(zn.icon, zn.name), transparent: true, side: THREE.DoubleSide })), bx, 6.2, bz);
+        void sg;
+      }));
       // Blocks with no venue get a row of homes.
       for (const x of G.cols) for (const z of G.rows) {
         if (Object.values(this.places).some((p) => !p.remote && Math.abs(p.x - x) < 10 && Math.abs(p.z - z) < 7)) continue;
@@ -265,7 +283,7 @@
       // Trees around the blocks.
       const trees = [];
       for (const x of G.cols) for (const z of G.rows) { trees.push([x - 9.6, z - 6.6], [x + 9.6, z - 6.6]); }
-      const inClub = (x, z) => ["beachclub", "shortlet", "conceptstore"].some((k) => { const bc = this.places[k]; return bc && Math.abs(x - bc.x) < bc.w / 2 + 2 && Math.abs(z - bc.z) < bc.d / 2 + 2; });
+      const inClub = (x, z) => ["beachclub", "shortlet", "conceptstore", "balogun", "beach"].some((k) => { const bc = this.places[k]; return bc && Math.abs(x - bc.x) < bc.w / 2 + 2 && Math.abs(z - bc.z) < bc.d / 2 + 2; });
       for (let x = -64; x <= 90; x += 9) if (!inClub(x, lagos ? 59 : 60)) trees.push([x, lagos ? 59 : 60]);
       this.addTrees(trees);
       this.buildDecorations();
@@ -481,12 +499,36 @@
       this.add(box(1.4, 2.2, 1.4, lam(0xf0e6c8)), x0 + 9.2, 1.2, z0 + 1.5);
     }
 
+    // Balogun Market: a waterfront maze of umbrella stalls, fabric racks and crowds.
+    buildBalogun(p) {
+      const x0 = p.x, z0 = p.z, w = p.w;
+      this.add(box(w + 8, 0.08, 12, lam(0x8f8a80)), x0, 0.07, z0 + 0.5); // paved marina instead of sand
+      const cols = [0xff3b4e, 0xffc400, 0x2f7de1, 0x20b46e, 0xff7a00, 0xb04bff];
+      for (let r = 0; r < 2; r++) for (let c = 0; c < 7; c++) {
+        const x = x0 - w / 2 + 2.5 + c * ((w - 5) / 6), z = z0 - 1.5 + r * 4.6;
+        const umb = this.add(new THREE.Mesh(new THREE.ConeGeometry(1.9, 0.7, 8), lam(cols[(r * 7 + c) % 6])), x, 2.6, z); void umb;
+        this.add(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.4, 4), lam(0x555555)), x, 1.2, z);
+        this.add(box(2.2, 0.8, 1.2, lam(0x6d4c41)), x, 0.45, z);
+        for (let k = 0; k < 3; k++) this.add(box(0.5, 0.25, 0.5, lam(cols[(c + k + r) % 6])), x - 0.6 + k * 0.6, 0.98, z);
+        this.collider(x, z, 2.3, 1.3);
+      }
+      // Fabric racks and Christmas decorations strung across.
+      for (let i = 0; i < 4; i++) { const x = x0 - w / 2 + 4 + i * ((w - 8) / 3); this.add(box(3, 0.08, 0.08, lam(0x333333)), x, 2.0, z0 + 3.9); for (let k = 0; k < 6; k++) this.add(box(0.4, 1.4, 0.05, lam(cols[(i + k) % 6])), x - 1.25 + k * 0.5, 1.25, z0 + 3.9); }
+      for (let i = 0; i <= 20; i++) this.add(new THREE.Mesh(new THREE.SphereGeometry(0.11, 6, 4), this.bulbMat), x0 - w / 2 + i * (w / 20), 3.4 - Math.sin((i / 20) * Math.PI) * 0.5, z0 + 1);
+      const sm = new THREE.MeshBasicMaterial({ map: signTexture(p.icon, p.name), transparent: true });
+      this.add(new THREE.Mesh(new THREE.PlaneGeometry(8, 2), sm), x0, 4.6, z0 - 3.55);
+      this.add(new THREE.Mesh(new THREE.PlaneGeometry(8, 2), sm), x0, 4.6, z0 - 3.65).rotation.y = Math.PI;
+      [-w / 2 + 0.5, w / 2 - 0.5].forEach((dx) => this.add(box(0.3, 4.4, 0.3, lam(0x444444)), x0 + dx, 2.2, z0 - 3.6));
+      this.add(box(w, 0.25, 0.25, lam(0x444444)), x0, 4.4, z0 - 3.6);
+    }
+
     buildPlace(p) {
       const T = W.TYPES[p.type];
       if (p.type === "beachclub") { this.buildBeachClub(p); return; }
       if (p.type === "shortlet") { this.buildMansion(p); return; }
       if (p.type === "conceptstore") { this.buildBoutique(p); return; }
       if (p.type === "lekkilounge") { this.buildNeonLounge(p); return; }
+      if (p.type === "balogun") { this.buildBalogun(p); return; }
       if (p.type === "lekkistreet") { this.buildLekkiStreet(p); return; }
       const front = p.z + (p.side === "S" ? 1 : -1) * (p.d / 2);
       const dir = p.side === "S" ? 1 : -1;
@@ -633,14 +675,18 @@
         signPole(p.x - 10, front - 0.5);
       } else if (t === "beach") {
         const cols = [0xff5252, 0xffd740, 0x40c4ff, 0x69f0ae];
-        for (let i = 0; i < 8; i++) {
-          const x = p.x - 18 + i * 5.2, z = p.z + (i % 2) * 2;
+        const nU = Math.max(3, Math.floor(p.w / 5.2));
+        for (let i = 0; i < nU; i++) {
+          const x = p.x - p.w / 2 + 2.5 + i * ((p.w - 5) / (nU - 1)), z = p.z + (i % 2) * 2;
           this.add(new THREE.Mesh(new THREE.ConeGeometry(1.6, 0.6, 10), lam(cols[i % 4])), x, 2.6, z);
           this.add(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.5, 4), lam(0xffffff)), x, 1.25, z);
           this.add(box(0.8, 0.2, 1.9, lam(0xffffff)), x + 1, 0.3, z + 0.4);
         }
-        for (let i = 0; i < 7; i++) { const x = -58 + i * 19; if (["beachclub", "shortlet", "conceptstore"].some((k) => { const bc = this.places[k]; return bc && Math.abs(x - bc.x) < bc.w / 2 + 2; })) continue; this.palm(x, 52.5 + (i % 2) * 1.4); }
-        signPole(p.x - 21, 52);
+        for (let i = 0; i < 9; i++) { const x = -58 + i * 19; if (["beachclub", "shortlet", "conceptstore", "balogun", "photo"].some((k) => { const bc = this.places[k]; return bc && Math.abs(x - bc.x) < bc.w / 2 + 2; })) continue; this.palm(x, 52.5 + (i % 2) * 1.4); }
+        signPole(p.x - p.w / 2 - 1, 52);
+        // Tarkwa Bay jetty and the boats that ferry people across.
+        this.add(box(2.4, 0.3, 9, lam(0x8a6b4a)), p.x + 6, 0.3, G.beach[1] + 4);
+        [[p.x + 9, G.beach[1] + 6, 0xffffff], [p.x + 3, G.beach[1] + 9, 0xffc400]].forEach(([bx, bz, c]) => { this.add(box(1.8, 0.7, 4.6, lam(c)), bx, 0.35, bz); this.add(box(1.4, 0.6, 1.6, lam(0x1f6f8b)), bx, 0.95, bz - 0.4); });
       } else if (t === "photo") {
         const wall = this.add(new THREE.Mesh(new THREE.BoxGeometry(9, 4.5, 0.4), [lam(0xffffff), lam(0xffffff), lam(0xffffff), lam(0xffffff), new THREE.MeshBasicMaterial({ map: muralTexture() }), lam(0xffffff)]), p.x, 2.25, p.z + 1);
         void wall;

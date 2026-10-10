@@ -46,6 +46,7 @@
     club: { icon: "🪩", kind: "building", h: 8, color: "#1d1b2e", roof: "#000000", neon: "#ff3dbb", hours: [hm("22:00"), hm("28:00")], actions: ["party", "dance", "club_meet", "club_network", "club_photos", "start_drama", "vip"] },
     concert: { icon: "🎤", kind: "open", hours: [hm("16:00"), hm("25:00")], eventOnly: "concert", actions: ["concert", "concert_photo_gig", "resell_tickets"] },
     lounge: { icon: "🌇", kind: "building", h: 16, color: "#263238", roof: "#ffb300", neon: "#ffb300", hours: [hm("17:00"), hm("26:00")], actions: ["sunset_drinks", "firepit_chill", "rooftop_party", "lounge_network", "club_photos", "vip_cabana", "dj_set"] },
+    balogun: { icon: "🧺", kind: "open", hours: [hm("07:00"), hm("19:00")], actions: ["wholesale_buy", "haggle_hunt", "market_xmas"] },
     beach: { icon: "🏖️", kind: "open", hours: [hm("08:00"), hm("19:00")], actions: ["chill", "beach_party", "picnic", "beach_photos"] },
     photo: { icon: "📸", kind: "open", hours: null, actions: ["photoshoot", "collab"] },
     airport: { icon: "✈️", kind: "remote", hours: null, actions: ["pickup", "watch_arrivals"] },
@@ -73,12 +74,12 @@
   const NAMES = {
     lagos: {
       family: "Family House", home: "Your Flat", mamaput: "Mama T's Kitchen", salon: "Cuts & Curls", gym: "Iron Paradise Gym",
-      office: "Yaba Tech Hub", church: "Grace Assembly", busstop: "Ojuelegba Bus Stop", market: "Tejuosho Market",
+      office: "Ikeja Tech Hub", church: "Grace Assembly", busstop: "Ojuelegba Bus Stop", market: "Tejuosho Market",
       hustle: "Computer Village", hall: "Eko Event Centre", hotel: "Eko Grand Hotel", bank: "Naija Trust Bank",
       bdc: "Mallam Musa BDC", mall: "Palms Mall", fashion: "Àṣà Fashion House", cafe: "Bean & Breeze Café",
       restaurant: "Island Grill", fastfood: "Chop Republic", suya: "Mallam Suya Spot", club: "Club Eko",
-      concert: "Eko Atlantic Festival Grounds", lounge: "Sky Rooftop Lounge", beach: "Oniru Beach",
-      photo: "The Detty Wall", airport: "Murtala Muhammed Airport", beachclub: "Eko Shores Beach Club", shortlet: "Ocean Crest Penthouse", conceptstore: "The Eko Concept Store", lekkilounge: "Neon Palm Lekki", lekkistreet: "Admiralty Close",
+      concert: "Eko Atlantic Festival Grounds", lounge: "Sky Rooftop Lounge", beach: "Tarkwa Bay Beach",
+      photo: "The Detty Wall", airport: "Murtala Muhammed Airport", beachclub: "Eko Shores Beach Club", shortlet: "Ocean Crest Penthouse", conceptstore: "The Eko Concept Store", lekkilounge: "Neon Palm Lekki", lekkistreet: "Admiralty Close", balogun: "Balogun Market",
     },
     abuja: {
       family: "Family House", home: "Your Flat", mamaput: "Mama Cass Kitchen", salon: "Wuse Cuts & Curls", gym: "Capital Fitness",
@@ -87,7 +88,7 @@
       bdc: "Zone 4 BDC", mall: "Jabi Lake Mall", fashion: "Àṣà Fashion House", cafe: "Bean & Breeze Café",
       restaurant: "Wuse 2 Grill", fastfood: "Chop Republic", suya: "Area 11 Suya", club: "Club Maitama",
       concert: "Eagle Square Concert Grounds", lounge: "Sky Lounge Maitama", beach: "Jabi Lakeside",
-      photo: "Millennium Park Arch", airport: "Nnamdi Azikiwe Airport", beachclub: "Jabi Shores Lakeside Club", shortlet: "Maitama Hills Penthouse", conceptstore: "Maitama Concept Store", lekkilounge: "Neon Palm Wuse", lekkistreet: "Gwarinpa Close",
+      photo: "Millennium Park Arch", airport: "Nnamdi Azikiwe Airport", beachclub: "Jabi Shores Lakeside Club", shortlet: "Maitama Hills Penthouse", conceptstore: "Maitama Concept Store", lekkilounge: "Neon Palm Wuse", lekkistreet: "Gwarinpa Close", balogun: "Garki Ultra-Modern Market",
     },
   };
 
@@ -107,12 +108,14 @@
         spot: { x: cx, z: doorZ + (side === "S" ? 2.2 : -2.2) }, // where people hang out
       };
     }
-    out.beach = { id: "beach", type: "beach", name: NAMES[city].beach, icon: TYPES.beach.icon, kind: "open", x: -8, z: 56, w: 40, d: 10, h: 0, side: "N", door: { x: -8, z: 54 }, spot: { x: -8, z: 55 } };
+    out.beach = { id: "beach", type: "beach", name: NAMES[city].beach, icon: TYPES.beach.icon, kind: "open", x: 80, z: 56, w: 24, d: 10, h: 0, side: "N", door: { x: 80, z: 54 }, spot: { x: 80, z: 55 } };
+    out.balogun = { id: "balogun", type: "balogun", name: NAMES[city].balogun, icon: TYPES.balogun.icon, kind: "open", x: -46, z: 56, w: 34, d: 9, h: 0, side: "N", door: { x: -46, z: 54 }, spot: { x: -46, z: 55 } };
     out.photo = { id: "photo", type: "photo", name: NAMES[city].photo, icon: TYPES.photo.icon, kind: "open", x: 40, z: 56, w: 12, d: 8, h: 0, side: "N", door: { x: 40, z: 54 }, spot: { x: 40, z: 55 } };
     out.beachclub = { id: "beachclub", type: "beachclub", name: NAMES[city].beachclub, icon: TYPES.beachclub.icon, kind: "building", x: 23, z: 56.5, w: 18, d: 9, h: 4, side: "N", door: { x: 23, z: 51.4 }, spot: { x: 23, z: 50.2 } };
-    out.shortlet = { id: "shortlet", type: "shortlet", name: NAMES[city].shortlet, icon: TYPES.shortlet.icon, kind: "building", x: -48, z: 56.5, w: 18, d: 9, h: 8, side: "N", door: { x: -48, z: 51.4 }, spot: { x: -48, z: 50.2 } };
+    out.shortlet = { id: "shortlet", type: "shortlet", name: NAMES[city].shortlet, icon: TYPES.shortlet.icon, kind: "building", x: -8, z: 56.5, w: 18, d: 9, h: 8, side: "N", door: { x: -8, z: 51.4 }, spot: { x: -8, z: 50.2 } };
     out.conceptstore = { id: "conceptstore", type: "conceptstore", name: NAMES[city].conceptstore, icon: TYPES.conceptstore.icon, kind: "building", x: 57, z: 56.5, w: 12, d: 9, h: 6, side: "N", door: { x: 57, z: 51.4 }, spot: { x: 57, z: 50.2 } };
-    out.airport = { id: "airport", type: "airport", name: NAMES[city].airport, icon: TYPES.airport.icon, kind: "remote", x: -66, z: -50, w: 0, d: 0, h: 0, side: "N", door: { x: -66, z: -50 }, spot: { x: -66, z: -50 }, remote: true };
+    out.airport = { id: "airport", type: "airport", name: NAMES[city].airport, icon: TYPES.airport.icon, kind: "remote", x: 86, z: -52, w: 0, d: 0, h: 0, side: "N", door: { x: 86, z: -52 }, spot: { x: 86, z: -52 }, remote: true };
+    for (const p of Object.values(out)) p.zone = zoneAt(city, p.x, p.z).id;
     return out;
   }
 
@@ -219,6 +222,10 @@
     movie_night: { name: "Movie night on the big screen", icon: "🎬", mins: 120, fx: { vibes: 20, energy: 6 } },
     content_shoot: { name: "Shoot content for the 'gram", icon: "🤳🏾", mins: 40, special: "post", clout: 3 },
     penthouse_party: { name: "Throw a penthouse party", icon: "🥂", mins: 240, cost: 180000, fx: { vibes: 40, energy: -20, social: 30 }, clout: 12, conn: 8, big: true, needsBooking: true, special: "host" },
+    // Lagos Island & Balogun: the wholesale market.
+    wholesale_buy: { name: "Buy wholesale to resell", icon: "📦", mins: 60, cost: 45000, gives: "wholesale", special: "pickpocket", desc: "Sell it on the mainland or in Lekki for about double." },
+    haggle_hunt: { name: "Haggle for Christmas gifts", icon: "🎁", mins: 45, cost: 9000, gives: "gift_box", special: "pickpocket", conn: 1 },
+    market_xmas: { name: "Shop Christmas decorations", icon: "🎄", mins: 40, cost: 7000, fx: { vibes: 10 }, special: "pickpocket" },
     // Lekki Phase 1 social hub.
     lekki_hangout: { name: "Eat, drink and catch up", icon: "🍤", mins: 75, cost: 18000, fx: { belle: 45, vibes: 14, social: 18 }, food: true, clout: 2 },
     lekki_lounge_chat: { name: "Lounge chats (network)", icon: "🛋️", mins: 45, cost: 8000, fx: { social: 12, vibes: 6 }, conn: 6, clout: 1, special: "meet" },
@@ -291,6 +298,44 @@
     watch_arrivals: { name: "Watch IJGBs land in matching tracksuits", icon: "👀", mins: 30, fx: { vibes: 6 }, gossip: 1 },
   };
 
+  // ------------------------------------------------------------ zones
+  // Six districts with their own colour, vibe and price level (the zone economy).
+  // Rects are in world units: [x0, z0, x1, z1].
+  const ZONES = {
+    lagos: [
+      { id: "yaba", name: "Yaba & Surulere", sub: "Budget Starter Hub", icon: "🏠", color: "#3ee06a", price: 1, mult: 0.85, side: "mainland", rect: [-68, -53, 13, -7], tagline: "Small steps. Big dreams.",
+        blurb: "Student life, side hustles and real connections. Where many stories begin.", features: ["Affordable shared apartments", "Local food spots", "Markets, bus stops and church"] },
+      { id: "ikeja", name: "Ikeja & Allen Avenue", sub: "Mid-Tier Hustle Hub", icon: "🛍️", color: "#ff9b21", price: 2, mult: 0.95, side: "mainland", rect: [13, -53, 94, -7], tagline: "Good food. Real people. Big energy.",
+        blurb: "Everyday Naija. Shop, eat, work and enjoy without draining your pocket.", features: ["Computer Village gadget hustles", "Salons, gyms and event centres", "Tech hub and the airport"] },
+      { id: "lagosisland", name: "Lagos Island & Balogun", sub: "Market Chaos Zone", icon: "🏪", color: "#ff3b4e", price: 2, mult: 0.9, side: "island", rect: [-68, 5, -13, 63], tagline: "Bargain. Hustle. Profit.",
+        blurb: "Buy low, sell high. The heart of Lagos trade. Crowded, chaotic, profitable.", features: ["Wholesale buying for resale", "Bargaining and pickpockets", "Banks, BDC and the old hotels"] },
+      { id: "vi", name: "Victoria Island & Eko Atlantic", sub: "Luxury Zone", icon: "👑", color: "#b45cff", price: 4, mult: 1.15, side: "island", rect: [-13, 5, 66, 63], tagline: "The higher you go, the better the view.",
+        blurb: "Luxury apartments, elite clubs and high-profile events. The top of the social ladder.", features: ["Beach clubs and rooftop parties", "Celebrity sightings", "Designer shopping and fine dining"] },
+      { id: "lekki", name: "Lekki Phase 1", sub: "Social Hub", icon: "🍸", color: "#ff3dbb", price: 3, mult: 1.05, side: "island", rect: [66, 5, 94, 50], tagline: "Same people. Different stories.",
+        blurb: "Lounges, restaurants, house parties and unexpected encounters.", features: ["Clubs, lounges and restaurants", "House parties and shared-flat drama", "Romance or trouble encounters"] },
+      { id: "tarkwa", name: "Tarkwa Bay & Lagos Beaches", sub: "Escape Zone", icon: "🌴", color: "#20d6e6", price: 3, mult: 1, weekend: 1.25, side: "island", rect: [66, 50, 94, 63], tagline: "Sun. Sea. Good vibes.",
+        blurb: "Sun, sea and good vibes. Escape the noise and clear your stress.", features: ["Beach parties and picnics", "Boat rides across the bay", "Prices rise at weekends"] },
+    ],
+    abuja: [
+      { id: "yaba", name: "Kubwa & Nyanya", sub: "Budget Starter Hub", icon: "🏠", color: "#3ee06a", price: 1, mult: 0.85, side: "mainland", rect: [-68, -53, 13, -7], tagline: "Small steps. Big dreams.",
+        blurb: "Where most young Abuja hustlers start: cheap rent, buka food and a long commute.", features: ["Affordable shared apartments", "Local food spots", "Markets, bus stops and church"] },
+      { id: "ikeja", name: "Wuse & Berger", sub: "Mid-Tier Hustle Hub", icon: "🛍️", color: "#ff9b21", price: 2, mult: 0.95, side: "mainland", rect: [13, -53, 94, -7], tagline: "Good food. Real people. Big energy.",
+        blurb: "Shops, plazas and offices. Hustle by day, small chops by night.", features: ["Banex gadget hustles", "Salons, gyms and event centres", "Tech hub and the airport"] },
+      { id: "lagosisland", name: "Garki & Area 10", sub: "Market Chaos Zone", icon: "🏪", color: "#ff3b4e", price: 2, mult: 0.9, side: "island", rect: [-68, 5, -13, 63], tagline: "Bargain. Hustle. Profit.",
+        blurb: "The old city centre: wholesale markets, banks and plenty of bargaining.", features: ["Wholesale buying for resale", "Bargaining and pickpockets", "Banks, BDC and hotels"] },
+      { id: "vi", name: "Maitama & Wuse II", sub: "Luxury Zone", icon: "👑", color: "#b45cff", price: 4, mult: 1.15, side: "island", rect: [-13, 5, 66, 63], tagline: "The higher you go, the better the view.",
+        blurb: "Embassies, lounges and quiet money. The top of the social ladder.", features: ["Lake club and rooftop parties", "Celebrity sightings", "Designer shopping and fine dining"] },
+      { id: "lekki", name: "Gwarinpa", sub: "Social Hub", icon: "🍸", color: "#ff3dbb", price: 3, mult: 1.05, side: "island", rect: [66, 5, 94, 50], tagline: "Same people. Different stories.",
+        blurb: "Estate lounges, house parties and unexpected encounters.", features: ["Clubs, lounges and restaurants", "House parties and shared-flat drama", "Romance or trouble encounters"] },
+      { id: "tarkwa", name: "Jabi Lake Shore", sub: "Escape Zone", icon: "🌴", color: "#20d6e6", price: 3, mult: 1, weekend: 1.25, side: "island", rect: [66, 50, 94, 63], tagline: "Sun. Lake. Good vibes.",
+        blurb: "Lake breeze, boat rides and good vibes. Clear your stress.", features: ["Lakeside parties and picnics", "Boat rides", "Prices rise at weekends"] },
+    ],
+  };
+  function zoneAt(city, x, z) {
+    const list = ZONES[city] || ZONES.lagos;
+    return list.find((zn) => x >= zn.rect[0] && x < zn.rect[2] && z >= zn.rect[1] && z < zn.rect[3]) || (z < -1 ? list[x < 13 ? 0 : 1] : list[x < -13 ? 2 : x < 66 ? 3 : 4]);
+  }
+
   // ------------------------------------------------------------ items
   const ITEMS = {
     phone: { name: "Phone", icon: "📱", kind: "gear" },
@@ -302,6 +347,7 @@
     concert_ticket: { name: "Detty Fest ticket", icon: "🎟️", kind: "ticket" },
     vip_band: { name: "VIP wristband", icon: "🎫", kind: "ticket" },
     merch: { name: "Detty merch (20 pieces)", icon: "👕", kind: "business", sell: 70000 },
+    wholesale: { name: "Balogun wholesale bundle", icon: "📦", kind: "business", sell: 95000 },
     souvenir: { name: "Owambe souvenir plate", icon: "🍽️", kind: "collectible" },
     stub: { name: "Concert wristband stub", icon: "🎗️", kind: "collectible" },
     slippers: { name: "Pam slippers", icon: "🩴", kind: "shoes", clout: -2 },
@@ -621,7 +667,7 @@
 
   const WD = {
     hm, DAY, GRID, TYPES, SLOTS, NAMES, buildPlaces, isOpen, weekday, WEEKDAYS, CONCERT_DAYS, PHASES, phase, eventsOn,
-    ACTIONS, ITEMS, CELEBS, LUXURY_SPOTS, STANDING, NPCS, GROUPS, STRANGER_NAMES, QUESTIONS, CHAINS, MISSIONS, IDENTITIES, ACHIEVEMENTS,
+    ACTIONS, ITEMS, ZONES, zoneAt, CELEBS, LUXURY_SPOTS, STANDING, NPCS, GROUPS, STRANGER_NAMES, QUESTIONS, CHAINS, MISSIONS, IDENTITIES, ACHIEVEMENTS,
   };
   if (typeof module !== "undefined") module.exports = WD;
   else root.WORLD = WD;

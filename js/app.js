@@ -73,48 +73,107 @@
 
   // ------------------------------------------------------------------ minimap
   // A top-down SVG of the city drawn from the same street grid as the 3D world.
+  // The city map: a night-time aerial view split into six neon zones (the zone
+  // economy), with the lagoon stretched open so the zone badges can sit in it.
   function minimap(city, opts = {}) {
     const G = W.GRID;
     const places = W.buildPlaces(city);
-    const X = (x) => (x + 72) * 5, Z = (z) => (z + 58) * 5;
+    const zones = W.ZONES[city] || W.ZONES.lagos;
     const lagos = city === "lagos";
-    const MW = (G.bounds.x[1] + 74) * 5;
-    let svg = `<svg class="minimap" viewBox="0 0 ${MW} 640" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Map of ${city}">`;
-    svg += `<rect width="${MW}" height="640" fill="${lagos ? "#d6e4b5" : "#cfe3b0"}"/>`;
-    svg += `<rect x="0" y="${Z(G.beach[0])}" width="${MW}" height="${(G.beach[1] - G.beach[0]) * 5}" fill="${lagos ? "#f1dda2" : "#c9e2a6"}"/>`;
-    svg += `<rect x="0" y="${Z(G.beach[1])}" width="${MW}" height="200" fill="${lagos ? "#3d97cf" : "#5cb2d6"}"/>`;
-    svg += `<rect x="0" y="${Z(G.water.band[0])}" width="${MW}" height="${(G.water.band[1] - G.water.band[0]) * 5}" fill="${lagos ? "#4fa9d6" : "#a9d68e"}"/>`;
-    for (const z of G.hRoads) svg += `<rect x="${X(G.bounds.x[0])}" y="${Z(z) - 15}" width="${(G.bounds.x[1] - G.bounds.x[0]) * 5}" height="30" fill="#5a606a"/>`;
+    const TOP = 104, MW = 870, MH = TOP + 638 + 150;
+    const [w0, w1] = G.water.band;
+    const X = (x) => (x + 74) * 5;
+    const Z = (z) => TOP + (z <= w0 ? (z + 55) * 5 : z < w1 ? 240 + (z - w0) * 9 : 348 + (z - w1) * 5);
+    const zc = (id) => zones.find((q) => q.id === id) || zones[0];
+    const zoneAt = (x, z) => W.zoneAt(city, x, z);
+    let svg = `<svg class="minimap" viewBox="0 0 ${MW} ${MH}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Map of ${city}">`;
+    svg += `<defs><filter id="mmglow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      <linearGradient id="mmsea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0c2f57"/><stop offset="1" stop-color="#061629"/></linearGradient>
+      <pattern id="mmwin" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#222a43"/><rect x="2" y="2" width="2" height="2" fill="#ffd27a" opacity=".55"/><rect x="5" y="5" width="2" height="1.5" fill="#9fd6ff" opacity=".35"/></pattern></defs>`;
+    // Water everywhere, then the land masses.
+    svg += `<rect width="${MW}" height="${MH}" fill="url(#mmsea)"/>`;
+    const land = lagos ? "#141b2d" : "#162418";
+    svg += `<rect x="${X(-68) - 10}" y="${Z(-55)}" width="${X(94) - X(-68) + 20}" height="${Z(w0) - Z(-55)}" rx="30" fill="${land}"/>`;
+    if (!lagos) svg += `<rect x="${X(-68) - 10}" y="${Z(w0)}" width="${X(94) - X(-68) + 20}" height="${Z(w1) - Z(w0)}" fill="#12301f"/>`;
+    svg += `<rect x="${X(-68) - 10}" y="${Z(w1)}" width="${X(94) - X(-68) + 20}" height="${Z(G.beach[0]) - Z(w1)}" rx="30" fill="${land}"/>`;
+    svg += `<rect x="${X(-68) - 10}" y="${Z(G.beach[0])}" width="${X(94) - X(-68) + 20}" height="${Z(G.beach[1]) - Z(G.beach[0])}" rx="12" fill="${lagos ? "#3b3423" : "#24412c"}"/>`;
+    svg += `<rect x="${X(-64)}" y="${Z(G.beach[0])}" width="${X(-28) - X(-64)}" height="${Z(G.beach[1]) - Z(G.beach[0])}" fill="#2a2a33"/>`; // Balogun's paved marina
+    // Zone fills and neon outlines.
+    zones.forEach((zn) => {
+      const [x0, z0, x1, z1] = zn.rect;
+      const rx = X(Math.max(x0, -68) + 0.6), ry = Z(Math.max(z0, -53) + 0.6), rw = X(Math.min(x1, 94) - 0.6) - rx, rh = Z(Math.min(z1, 62.5) - 0.6) - ry;
+      svg += `<rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" rx="22" fill="${zn.color}" fill-opacity=".09" stroke="${zn.color}" stroke-width="4" filter="url(#mmglow)" class="mm-zonebox${opts.zone === zn.id ? " here" : ""}"/>`;
+    });
+    // Roads and bridges.
+    for (const z of G.hRoads) svg += `<rect x="${X(G.bounds.x[0])}" y="${Z(z) - 12}" width="${X(G.bounds.x[1]) - X(G.bounds.x[0])}" height="24" fill="#2b3352"/><line x1="${X(G.bounds.x[0])}" x2="${X(G.bounds.x[1])}" y1="${Z(z)}" y2="${Z(z)}" stroke="#5a6488" stroke-width="1.5" stroke-dasharray="8 8"/>`;
     for (const x of G.vRoads) for (let j = 0; j < G.hRoads.length - 1; j++) {
       const z1 = G.hRoads[j], z2 = G.hRoads[j + 1];
-      if (lagos && z1 < G.water.band[0] && z2 > G.water.band[1] && !G.water.bridges.includes(x)) continue;
-      svg += `<rect x="${X(x) - 15}" y="${Z(z1)}" width="30" height="${(z2 - z1) * 5}" fill="#5a606a"/>`;
+      const crosses = z1 < w0 && z2 > w1;
+      if (lagos && crosses && !G.water.bridges.includes(x)) continue;
+      svg += `<rect x="${X(x) - 12}" y="${Z(z1)}" width="24" height="${Z(z2) - Z(z1)}" fill="${crosses && lagos ? "#56607f" : "#2b3352"}"/>`;
+      if (crosses && lagos) svg += `<rect x="${X(x) - 14}" y="${Z(w0) - 2}" width="28" height="${Z(w1) - Z(w0) + 4}" fill="none" stroke="#c9d3ff" stroke-width="2" opacity=".7"/>`;
     }
-    for (const p of Object.values(places)) if (!p.remote && p.kind === "building") svg += `<rect x="${X(p.x - p.w / 2 + 0.5)}" y="${Z(p.z - p.d / 2 + 0.5)}" width="${(p.w - 1) * 5}" height="${(p.d - 1) * 5}" rx="6" fill="${W.TYPES[p.type].color}" stroke="rgba(0,0,0,.12)"/>`;
-    svg += `<text x="${X(30)}" y="${Z(-0.6)}" class="mm-water">${lagos ? "LAGOS LAGOON" : "RING ROAD PARK"}</text>`;
-    svg += `<text x="360" y="${Z(G.beach[1]) + 40}" class="mm-water">${lagos ? "ATLANTIC OCEAN" : "JABI LAKE"}</text>`;
-    // The Luxury Zone: everything south of the lagoon.
-    svg += `<rect x="${X(-67.5)}" y="${Z(9.5)}" width="${133 * 5}" height="${(G.beach[1] - 9.5) * 5}" rx="18" class="mm-lux"/>`;
-    svg += `<rect x="${X(66.5)}" y="${Z(9.5)}" width="${27 * 5}" height="${(G.beach[1] - 9.5) * 5}" rx="18" class="mm-lekki"/>`;
-    svg += `<text x="${X(80)}" y="${Z(G.beach[0]) + 26}" class="mm-zone lekki">🌴 ${lagos ? "LEKKI PHASE 1" : "GWARINPA"}</text><text x="${X(80)}" y="${Z(G.beach[0]) + 44}" class="mm-zone lekki sub">SOCIAL HUB</text>`;
-    svg += `<text x="${X(-66)}" y="${Z(11.4)}" class="mm-zone">👑 ${lagos ? "VICTORIA ISLAND & EKO ATLANTIC" : "MAITAMA & WUSE II"} · LUXURY ZONE</text>`;
-    svg += `<text x="${X(-66)}" y="${Z(-3.2)}" class="mm-zone main">🛠️ MAINLAND · HUSTLE ZONE</text>`;
-    svg += `<text x="${X(0)}" y="${Z(28) + 5}" class="mm-strip">✦ THE STRIP ✦</text>`;
-    if (lagos) svg += `<text x="${X(67)}" y="${Z(G.beach[1]) + 30}" class="mm-zone eko" style="text-anchor:end">🏙️ EKO ATLANTIC ➜</text>`;
-    if (opts.celeb) svg += `<g class="mm-celeb"><circle cx="${X(opts.celeb.x)}" cy="${Z(opts.celeb.z) - 26}" r="13"/><text x="${X(opts.celeb.x)}" y="${Z(opts.celeb.z) - 21}">⭐</text><text class="nm" x="${X(opts.celeb.x)}" y="${Z(opts.celeb.z) - 44}">${esc(opts.celeb.label)}</text></g>`;
-    (opts.people || []).forEach((p) => { svg += `<circle cx="${X(p.x)}" cy="${Z(p.z)}" r="7" fill="${p.color}" stroke="#fff" stroke-width="2"><title>${esc(p.label)}</title></circle>`; });
+    // Buildings: every venue, plus rows of homes on the empty blocks.
+    const occupied = (x, z) => Object.values(places).some((p) => !p.remote && Math.abs(p.x - x) < 10 && Math.abs(p.z - z) < 7);
+    for (const x of G.cols) for (const z of G.rows) if (!occupied(x, z)) for (let i = 0; i < 3; i++) svg += `<rect x="${X(x - 9 + i * 6.4)}" y="${Z(z - 4.5)}" width="${5.2 * 5}" height="${Z(z + 2.5) - Z(z - 4.5)}" rx="3" fill="url(#mmwin)" stroke="${zoneAt(x, z).color}" stroke-opacity=".35"/>`;
     for (const p of Object.values(places)) {
       if (p.remote) continue;
-      const sel = opts.sel === p.id;
-      const x = X(p.door.x), y = Z(p.door.z);
-      const full = p.id === "home" ? "Your Flat" : p.name;
-      const label = full.length > 16 ? full.slice(0, 15) + "…" : full;
-      const w = label.length * 7.4 + 30;
-      svg += `<g class="mm-pin${sel ? " sel" : ""}${opts.here === p.id ? " here" : ""}" data-place="${p.id}" tabindex="0" role="button" aria-label="${esc(label)}">`;
-      svg += `<rect x="${x - w / 2}" y="${y - 14}" width="${w}" height="26" rx="13"/><text x="${x}" y="${y + 4}">${p.icon} ${esc(label)}</text></g>`;
+      const zn = zc(p.zone);
+      const pw = Math.max(4, p.w - 1), pd = Math.max(4, p.d - 1);
+      svg += `<rect x="${X(p.x - pw / 2)}" y="${Z(p.z - pd / 2)}" width="${pw * 5}" height="${Z(p.z + pd / 2) - Z(p.z - pd / 2)}" rx="5" fill="${p.kind === "building" ? "url(#mmwin)" : zn.color}" fill-opacity="${p.kind === "building" ? 1 : 0.16}" stroke="${zn.color}" stroke-opacity=".55"/>`;
     }
-    if (opts.me) svg += `<g class="mm-me"><circle cx="${X(opts.me.x)}" cy="${Z(opts.me.z)}" r="11" fill="#20b46e" stroke="#fff" stroke-width="3"/><text x="${X(opts.me.x)}" y="${Z(opts.me.z) - 18}">You</text></g>`;
+    // Banners, water labels and landmarks.
+    const banner = (cx, y, title, sub, col) => `<g class="mm-banner"><rect x="${cx - 190}" y="${y}" width="380" height="44" rx="12" fill="#0b0f1d" fill-opacity=".85" stroke="${col}" stroke-width="2"/><text x="${cx}" y="${y + 21}" class="t" fill="${col}">${title}</text><text x="${cx}" y="${y + 37}" class="s">${sub}</text></g>`;
+    svg += banner(MW / 2, 8, lagos ? "THE MAINLAND" : "THE OUTSKIRTS", "The Hustle. The Real. The Everyday.", "#ffd76a");
+    svg += banner(MW / 2, MH - 52, lagos ? "THE ISLAND" : "THE CITY CENTRE", "The Luxury. The Show. The Escape.", "#ffd76a");
+    svg += `<text x="${X(-9)}" y="${Z(w1) - 14}" class="mm-water">${lagos ? "L A G O S   L A G O O N" : "R I N G   R O A D   P A R K"}</text>`;
+    if (lagos) svg += `<text x="${X(13) + 18}" y="${Z(w1) - 26}" class="mm-bridge">THIRD MAINLAND</text><text x="${X(13) + 18}" y="${Z(w1) - 12}" class="mm-bridge">BRIDGE ◂</text>`;
+    svg += `<text x="${X(-40)}" y="${Z(G.beach[1]) + 40}" class="mm-water sm">${lagos ? "🚢 APAPA PORT  ·  A T L A N T I C   O C E A N" : "J A B I   L A K E"}</text>`;
+    if (lagos) svg += `<text x="${MW - 16}" y="${MH - 22}" class="mm-land" text-anchor="end">🏙️ EKO ATLANTIC ➜</text>`;
+    svg += `<text transform="translate(${MW - 8} ${Z(26)}) rotate(90)" class="mm-land sm" text-anchor="middle">${lagos ? "TO AJAH, SANGOTEDO ➜" : "TO KUBWA EXPRESSWAY ➜"}</text>`;
+    svg += `<g class="mm-compass" transform="translate(42 ${MH - 40})"><circle r="22" fill="#0b0f1d" stroke="#5a6488"/><path d="M0 -16 L5 0 L0 16 L-5 0 Z" fill="#ffd76a"/><text y="-25" text-anchor="middle">N</text></g>`;
+    // Zone badges with stems pointing at their district.
+    const badge = (id, cx, cy, toY) => {
+      const zn = zc(id);
+      const words = zn.name.toUpperCase().split(" & ");
+      const lines = words.length > 1 ? [words[0] + " &", words.slice(1).join(" & ")] : [zn.name.toUpperCase()];
+      const w = Math.max(Math.max(...lines.map((l) => l.length)) * 8.4, (zn.sub.length + 2) * 6.6) + 62, h = 18 + lines.length * 14 + 12;
+      const tx = typeof toY === "object" ? toY.x : cx, ty = typeof toY === "object" ? toY.y : toY;
+      let g = `<g class="mm-badge"><line x1="${cx}" y1="${ty > cy ? cy + h / 2 : cy - h / 2}" x2="${tx}" y2="${ty}" stroke="${zn.color}" stroke-width="2"/><circle cx="${tx}" cy="${ty}" r="4" fill="${zn.color}"/>`;
+      g += `<rect x="${cx - w / 2}" y="${cy - h / 2}" width="${w}" height="${h}" rx="12" fill="#0b0f1d" fill-opacity=".9" stroke="${zn.color}" stroke-width="2" filter="url(#mmglow)"/>`;
+      g += `<circle cx="${cx - w / 2 + 22}" cy="${cy}" r="15" fill="#0b0f1d" stroke="${zn.color}" stroke-width="2.5"/><text x="${cx - w / 2 + 22}" y="${cy + 5}" class="ic">${zn.icon}</text>`;
+      lines.forEach((l, i) => { g += `<text x="${cx - w / 2 + 44}" y="${cy - h / 2 + 20 + i * 14}" class="t">${esc(l)}</text>`; });
+      g += `<text x="${cx - w / 2 + 44}" y="${cy - h / 2 + 20 + lines.length * 14}" class="s" fill="${zn.color}">(${esc(zn.sub)})</text></g>`;
+      return g;
+    };
+    svg += badge("yaba", X(-40), 78, Z(-46));
+    svg += badge("ikeja", X(48), 78, Z(-46));
+    svg += badge("lagosisland", X(-50), Z(w0) + 34, Z(w1) + 18);
+    svg += badge("vi", X(40), Z(w0) + 34, Z(w1) + 18);
+    svg += badge("lekki", X(76), Z(w0) + 34, Z(w1) + 18);
+    svg += badge("tarkwa", X(68), Z(G.beach[1]) + 46, { x: X(84), y: Z(G.beach[1]) - 4 });
+    if (opts.celeb) svg += `<g class="mm-celeb"><circle cx="${X(opts.celeb.x)}" cy="${Z(opts.celeb.z) - 26}" r="13"/><text x="${X(opts.celeb.x)}" y="${Z(opts.celeb.z) - 21}">⭐</text><text class="nm" x="${X(opts.celeb.x)}" y="${Z(opts.celeb.z) - 44}">${esc(opts.celeb.label)}</text></g>`;
+    (opts.people || []).forEach((p) => { svg += `<circle cx="${X(p.x)}" cy="${Z(p.z)}" r="7" fill="${p.color}" stroke="#fff" stroke-width="2"><title>${esc(p.label)}</title></circle>`; });
+    // Place pins, coloured by zone.
+    for (const p of Object.values(places)) {
+      const sel = opts.sel === p.id;
+      const zn = zc(p.zone);
+      const twin = Object.values(places).some((q) => q !== p && !q.remote && q.z === p.z && q.x < p.x && p.x - q.x < 12);
+      const open = p.kind === "open" && p.z > 50;
+      const x = Math.min(MW - 70, X(p.door.x)), y = p.remote ? Z(p.z) + 6 : twin ? Z(p.z) - 6 : open ? Z(p.z) + 2 : Z(p.door.z);
+      const full = p.id === "home" ? "Your Flat" : p.name;
+      const label = full.length > 13 ? full.slice(0, 12) + "…" : full;
+      const w = label.length * 6.3 + 28;
+      svg += `<g class="mm-pin${sel ? " sel" : ""}${opts.here === p.id ? " here" : ""}" data-place="${p.id}" tabindex="0" role="button" aria-label="${esc(full)}" style="--zc:${zn.color}">`;
+      svg += `<rect x="${x - w / 2}" y="${y - 12}" width="${w}" height="22" rx="11"/><text x="${x}" y="${y + 3.5}">${p.icon} ${esc(label)}</text></g>`;
+    }
+    if (opts.me) svg += `<g class="mm-me"><circle cx="${X(opts.me.x)}" cy="${Z(opts.me.z)}" r="11" fill="#20b46e" stroke="#fff" stroke-width="3" filter="url(#mmglow)"/><text x="${X(opts.me.x)}" y="${Z(opts.me.z) - 18}">You</text></g>`;
     return svg + "</svg>";
+  }
+  // The zone economy cards under the map.
+  function zoneCards(city, here) {
+    const zones = W.ZONES[city] || W.ZONES.lagos;
+    return `<div class="zone-legend">${zones.map((z) => `<span style="--zc:${z.color}"><i></i>${esc(z.name)}</span>`).join("")}</div><div class="zone-cards">${zones.map((z) => `<div class="zcard${here === z.id ? " here" : ""}" style="--zc:${z.color}"><div class="zc-top"><span class="zc-ic">${z.icon}</span><div><b>${esc(z.name)}</b><small>${esc(z.sub)}</small></div></div><div class="zc-price">${"₦".repeat(z.price)}<s>${"₦".repeat(4 - z.price)}</s><em>${["", "Lowest", "Affordable", "Moderate", "Expensive"][z.price]}${z.weekend ? " · pricier at weekends" : ""}</em></div><p>${esc(z.blurb)}</p><ul>${z.features.map((f) => `<li>${esc(f)}</li>`).join("")}</ul><i class="zc-tag">${esc(z.tagline)}</i>${here === z.id ? `<span class="zc-here">📍 You're here</span>` : ""}</div>`).join("")}</div>`;
   }
 
   // ------------------------------------------------------------------ boot and landing
@@ -349,6 +408,7 @@
     if (store.get("december-wahala-music") && window.Music && !Music.on) window.addEventListener("pointerdown", () => setMusic(true), { once: true });
   }
   function stopGame() {
+    app.zoneWas = null;
     cancelAnimationFrame(app.raf);
     if (window.Minigames) Minigames.close();
     if (app.world) { app.world.dispose(); app.world = null; }
@@ -698,6 +758,13 @@
     const faceKey = JSON.stringify(s.look);
     if ($("h-face").dataset.k !== faceKey) { $("h-face-svg").innerHTML = memo("bust", s.look); $("h-face").dataset.k = faceKey; }
     $("h-face").style.setProperty("--ring", sim.mood() >= 55 ? "var(--mint)" : sim.mood() >= 30 ? "var(--gold)" : "var(--coral)");
+    // Which zone you're in (and a toast when you cross into a new one).
+    const zp = app.world && !app.world.interior ? app.world.player.position : (s.place && sim.places[s.place]) || sim.places.home;
+    const zn = W.zoneAt(s.city, zp.x, zp.z);
+    const zh = `<i style="background:${zn.color}"></i>${zn.icon} ${esc(zn.name)} <b>${"₦".repeat(zn.price)}</b>`;
+    if ($("h-zone").dataset.html !== zh) { $("h-zone").innerHTML = zh; $("h-zone").dataset.html = zh; $("h-zone").style.setProperty("--zc", zn.color); }
+    if (app.zoneWas && app.zoneWas !== zn.id) toast(`${zn.icon} Entering ${zn.name} · ${zn.sub} · ${"₦".repeat(zn.price)}`);
+    app.zoneWas = zn.id;
     const nh = Object.keys(NEEDS).map((k) => needBar(k, s.needs[k])).join("");
     if ($("h-needs").dataset.html !== nh) { $("h-needs").innerHTML = nh; $("h-needs").dataset.html = nh; }
     const mls = sim.moodlets().sort((a, b) => b.w - a.w).slice(0, 7);
@@ -1021,7 +1088,7 @@
       if (!it) return;
       const equipped = s.equip.shoes === k || s.equip.bag === k || s.equip.jewelry === k || s.equip.limited === k;
       const verb = it.kind === "food" ? "Eat" : ["shoes", "bag", "jewelry", "limited"].includes(it.kind) ? (equipped ? (it.kind === "shoes" ? "Wearing" : "Take off") : "Wear") : it.kind === "business" ? "Sell" : null;
-      html += `<div class="inv-item"><span class="ii">${it.icon}</span><div><b>${esc(it.name)}${n > 1 ? ` ×${n}` : ""}</b><small>${{ gift: "Give it in a conversation", ticket: "Opens the door", collectible: "A December keepsake", gear: "Messages, posts, rides", food: "Eat it anywhere", shoes: equipped ? "On your feet" : "", bag: "", jewelry: "", business: "Sell at the concert grounds or beach", limited: `Numbered #${String(s.limited[k] || 1).padStart(3, "0")}/${it.edition}${equipped ? " · wearing" : ""}` }[it.kind] || ""}${it.clout ? ` · ${it.clout > 0 ? "+" : ""}${it.clout} clout` : ""}</small></div>${verb ? `<button class="btn sm" data-use="${k}" ${verb === "Wearing" ? "disabled" : ""}>${verb}</button>` : ""}</div>`;
+      html += `<div class="inv-item"><span class="ii">${it.icon}</span><div><b>${esc(it.name)}${n > 1 ? ` ×${n}` : ""}</b><small>${{ gift: "Give it in a conversation", ticket: "Opens the door", collectible: "A December keepsake", gear: "Messages, posts, rides", food: "Eat it anywhere", shoes: equipped ? "On your feet" : "", bag: "", jewelry: "", business: k === "wholesale" ? "Resell on the mainland or the Lekki close" : "Sell at the concert grounds or beach", limited: `Numbered #${String(s.limited[k] || 1).padStart(3, "0")}/${it.edition}${equipped ? " · wearing" : ""}` }[it.kind] || ""}${it.clout ? ` · ${it.clout > 0 ? "+" : ""}${it.clout} clout` : ""}</small></div>${verb ? `<button class="btn sm" data-use="${k}" ${verb === "Wearing" ? "disabled" : ""}>${verb}</button>` : ""}</div>`;
     });
     html += `</div>`;
     return ["Bag", html];
@@ -1033,7 +1100,9 @@
     const friends = W.NPCS.filter((n) => s.npcs[n.id].met && !n.vendor);
     const pp = sim.peoplePositions().filter((p) => friends.some((f) => f.id === p.id)).map((p) => ({ x: p.x, z: p.z, color: "#f2b632", label: sim.who(p.id).name }));
     const cel = s.celeb && s.celeb.until > s.t ? s.celeb : null, cp = cel && sim.places[cel.place];
-    let html = `<div class="map-wrap">${minimap(s.city, { me: app.world && !app.world.interior ? { x: app.world.player.position.x, z: app.world.player.position.z } : pos, sel: app.mapSel, here: s.place, people: pp, celeb: cp ? { x: cp.door.x, z: cp.door.z, label: sim.celebDef(cel.id).name } : null })}</div>`;
+    const mePos = app.world && !app.world.interior ? { x: app.world.player.position.x, z: app.world.player.position.z } : pos;
+    const hereZone = W.zoneAt(s.city, mePos.x, mePos.z).id;
+    let html = `<button class="btn sm map-zoom" data-mapzoom>${app.mapZoom ? "🔎 Fit map" : "🔍 Zoom in"}</button><div class="map-wrap${app.mapZoom ? " zoom" : ""}">${minimap(s.city, { me: mePos, sel: app.mapSel, here: s.place, zone: hereZone, people: pp, celeb: cp ? { x: cp.door.x, z: cp.door.z, label: sim.celebDef(cel.id).name } : null })}</div>`;
     html += `<p class="muted-sm" style="margin:6px 0 0">🚦 Traffic now: <b>${sim.trafficLabel()}</b> · 🟡 friends you've met${cel ? ` · ⭐ ${esc(sim.celebDef(cel.id).name)} at ${esc(cp.name)}` : ""}</p>`;
     const remote = ["airport"];
     html += `<div class="chips small-chips">${remote.map((id) => `<button data-mapsel="${id}" class="${app.mapSel === id ? "sel" : ""}">${sim.places[id].icon} ${esc(sim.places[id].name)}</button>`).join("")}</div>`;
@@ -1047,6 +1116,7 @@
       });
       html += `</div>`;
     } else html += `<p class="muted-sm">Tap a place to see how to get there.</p>`;
+    html += `<p class="section-title">Zone economy</p>` + zoneCards(s.city, hereZone);
     return ["Map", html];
   }
 
@@ -1307,6 +1377,7 @@
   $("h-music").addEventListener("click", () => setMusic(!(window.Music && Music.on)));
   $("h-phone-btn").addEventListener("click", () => { if (app.panel === "phone") { closeSheet(); renderHud(true); return; } openPanel("phone"); app.phoneApp = app.sim && app.sim.s.phone.unread ? "chats" : null; refreshPanel(); renderHud(true); });
   $("h-face").addEventListener("click", () => { openPanel("me"); renderHud(true); });
+  $("h-zone").addEventListener("click", () => { openPanel("map"); renderHud(true); });
   $("h-ability").addEventListener("click", () => { app.sim.useAbility(); renderHud(true); });
   $("h-clean").addEventListener("click", () => { $("hud").classList.toggle("clean"); $("h-clean").textContent = $("hud").classList.contains("clean") ? "⌄ Show goals" : "⌃ Clean screen"; });
   $("h-menu").addEventListener("click", () => {
@@ -1346,6 +1417,7 @@
     if (d.ability !== undefined) { sim.useAbility(); renderHud(true); return; }
     if (d.wear) { sim.wear(d.wear); refreshPanel(); return; }
     if (d.use) { sim.equipItem(d.use); refreshPanel(); renderHud(true); return; }
+    if (d.mapzoom !== undefined) { app.mapZoom = !app.mapZoom; refreshPanel(); return; }
     if (d.place || d.mapsel) { app.mapSel = d.place || d.mapsel; refreshPanel(); return; }
     if (d.ride) {
       const to = app.mapSel;

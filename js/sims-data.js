@@ -181,6 +181,7 @@
     hustle: { name: "Hustle", icon: "💼", desc: "Gigs and deals pay more." },
   };
   const SKILL_OF = {
+    wholesale_buy: "hustle", haggle_hunt: "charisma",
     lekki_lounge_chat: "charisma", lekki_club_night: "dancing", house_party: "dancing", neighbour_gist: "charisma",
     store_network: "charisma", styling_session: "photography",
     cook: "cooking", takeaway_jollof: null,
@@ -211,6 +212,7 @@
 
   // How your Sim looks while doing each action.
   const POSES = {
+    wholesale_buy: "talk", haggle_hunt: "talk", market_xmas: "stand",
     lekki_hangout: "eat", lekki_lounge_chat: "talk", lekki_club_night: "dance", house_party: "dance", street_hang: "talk", neighbour_gist: "talk",
     chef_tasting: "eat", styling_session: "stand", store_network: "talk", buy_wristband: "stand",
     eat_amala: "eat", fine_dining: "eat", fast_food: "eat", coffee: "eat", family_food: "eat", owambe_eat: "eat", suya: "eat", christmas_lunch: "eat",
@@ -511,11 +513,13 @@
     concert: [{ label: "Main stage", icon: "🎤", act: ["concert", "concert_photo_gig", "resell_tickets", "crossover"] }],
     beach: [{ label: "Beach", icon: "🏖️", act: ["chill", "picnic", "beach_party", "beach_photos", "crossover"] }],
     photo: [{ label: "Detty Wall", icon: "📸", act: ["photoshoot", "collab"] }],
+    balogun: [{ label: "Wholesale stalls", icon: "📦", act: ["wholesale_buy", "haggle_hunt", "market_xmas"] }],
     lekkistreet: [{ label: "Party house", icon: "🏠", act: ["house_party"] }, { label: "The close", icon: "🛵", act: ["street_hang", "neighbour_gist"] }],
   };
 
   // Venue atmosphere moodlets (no timer: they last while you're there).
   const ATMOSPHERE = {
+    balogun: { emotion: "energized", w: 1, label: "Market Chaos", icon: "🧺" },
     lekkilounge: { emotion: "playful", w: 1, label: "Lekki Energy", icon: "🌴" },
     conceptstore: { emotion: "confident", w: 1, label: "Retail Therapy", icon: "💎" },
     club: { emotion: "playful", w: 1, label: "Party Atmosphere", icon: "🪩", night: true },

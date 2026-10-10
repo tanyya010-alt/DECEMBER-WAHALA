@@ -658,7 +658,7 @@
       const a = this.actionDef(id);
       if (!a || !a.cost) return 0;
       if (id === "vip" && (this.s.inventory.vip_band || 0) > 0) return 0;
-      return this.price(a.cost, this.places[placeId].type);
+      return round100(this.price(a.cost, this.places[placeId].type) * this.zoneMult(placeId));
     }
     blocked(id, placeId) {
       const s = this.s, a = this.actionDef(id), p = this.places[placeId];
@@ -921,6 +921,14 @@
           if (this.rng() < 0.5) this.maybeChanceEncounter(placeId, 1, true);
           return pick([" The DJ was somebody's cousin. Still a banger.", " Somebody's aunty called the police twice. Nobody left.", " Jollof in coolers, music to the ceiling. Peak Lekki."]);
         }
+        case "pickpocket": {
+          if (this.rng() < 0.2 - this.streetSense() / 600 && s.naira > 0) {
+            const lost = Math.min(s.naira, round100(5000 + this.rng() * 12000));
+            s.naira -= lost; this.addStress(8);
+            return ` 🫳🏾 Somebody's hand was in your pocket in the crowd. You lost ${naira(lost)}.`;
+          }
+          return "";
+        }
         case "styled": s.flags.styled = this.day(); return " Your stylist tightened the whole look. +2 on every fit check today.";
         case "tasting": {
           s.flags.clout2 = s.t + 30; this.addMoodlet("double_clout");
@@ -1018,6 +1026,13 @@
       else if (it.kind === "jewelry") { s.equip.jewelry = s.equip.jewelry === item ? null : item; s.look.chain = s.equip.jewelry === "chain"; }
       else if (it.kind === "limited") s.equip.limited = s.equip.limited === item ? null : item;
       else if (it.kind === "food") { s.inventory[item]--; this.applyFx(it.eat); this.log(`${it.icon} You ate the ${it.name.toLowerCase()}.`, "action"); }
+      else if (it.kind === "business" && item === "wholesale") {
+        const pt = s.place && this.places[s.place].type;
+        if (!["market", "busstop", "lekkistreet", "hall", "hustle"].includes(pt)) { this.log("Resell your Balogun bundle at Tejuosho market, the bus stop, Computer Village, an owambe or the Lekki close.", "bad"); return false; }
+        s.inventory.wholesale--; const pay = round100(it.sell * (0.85 + this.rng() * 0.3) * (1 + this.skill("hustle") * 0.04)); this.earn(pay, "resale");
+        this.passTime(60); this.gainSkill("hustle", 6);
+        this.log(`📦 You flipped your Balogun bundle for ${naira(pay)}. Buy low, sell high.`, "good");
+      }
       else if (it.kind === "business" && item === "merch") {
         if (!s.place || this.places[s.place].type !== "concert" && this.places[s.place].type !== "beach") { this.log("Sell merch at the concert grounds or the beach.", "bad"); return false; }
         s.inventory.merch--; const pay = round100(it.sell * (s.persona === "hustler" ? 1 + s.res / 100 : 0.9)); this.earn(pay, "merch");
@@ -1166,6 +1181,14 @@
 
     // ============================================================ the Luxury Zone
     // Victoria Island & Eko Atlantic: everything south of the lagoon.
+    // The zone economy: each district has its own price level.
+    zoneOf(placeId) { const p = this.places[placeId]; return p ? W.zoneAt(this.s.city, p.x, p.z) : null; }
+    zoneMult(placeId) {
+      const z = this.zoneOf(placeId);
+      if (!z) return 1;
+      const wd = W.weekday(this.day());
+      return z.mult * (z.weekend && (wd === 0 || wd === 6) ? z.weekend : 1);
+    }
     celebDef(id) { return id && W.CELEBS ? W.CELEBS.find((c) => c.id === id) || null : null; }
     celebHere(placeId) { const c = this.s.celeb; return c && c.place === placeId && c.until > this.s.t ? c : null; }
     inLuxuryZone(placeId) { const p = this.places[placeId]; return !!p && !p.remote && p.z > 5; }
