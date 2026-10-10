@@ -1016,3 +1016,8 @@ body.cityview .hud-left, body.cityview .hud-me, body.cityview #h-ticker, body.ci
 .map-btns { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 8px; }
 .map-btns .map-zoom { margin: 0; }
 @media (max-width: 560px) { .ov-bar { top: calc(env(safe-area-inset-top, 0px) + 60px); right: 76px; } .ov-chip { padding: 6px 10px; font-size: .8rem; } }
+
+.hud-cam-btn { top: calc(env(safe-area-inset-top, 0px) + 80px); font-size: 1.3rem; }
+.hud-cam-btn.on { background: var(--ink); }
+@media (max-width: 640px) { .hud-cam-btn { top: calc(env(safe-area-inset-top, 0px) + 112px); } }
+body.cityview .hud-cam-btn { display: none; }

@@ -186,6 +186,15 @@
         }
         for (let z = z1 + 5; z < z2 - 4; z += 4) dashes.push([x, z, Math.PI / 2]);
       }
+      // Yellow-and-black kerbs down the middle of the big roads, Lagos style.
+      const kerbs = [];
+      for (const z of [G.hRoads[2], G.hRoads[4]]) for (let x = G.bounds.x[0] + 4; x < G.bounds.x[1] - 4; x += 1.2) if (!G.vRoads.some((v) => Math.abs(v - x) < 4)) kerbs.push([x, z, kerbs.length % 2]);
+      ["k0", "k1"].forEach((_, c) => {
+        const list = kerbs.filter((k) => k[2] === c);
+        const im = new THREE.InstancedMesh(new THREE.BoxGeometry(1.2, 0.35, 0.45), lam(c ? 0x15161a : 0xf0c52a), list.length);
+        const km = new THREE.Matrix4(); list.forEach(([x, z], i) => { km.makeTranslation(x, 0.2, z); im.setMatrixAt(i, km); });
+        this.cityGroup.add(im);
+      });
       const dashMesh = new THREE.InstancedMesh(dashGeo, new THREE.MeshBasicMaterial({ color: 0xf5f1e6 }), dashes.length);
       const m4 = new THREE.Matrix4();
       dashes.forEach(([x, z, r], i) => { m4.makeRotationY(r); m4.setPosition(x, 0.11, z); dashMesh.setMatrixAt(i, m4); });
@@ -1183,6 +1192,7 @@
       this.player.userData.phase += realDt * (moving ? (run ? 11 : 8.5) : pose === "dance" ? 6.5 : pose === "workout" ? 10 : 2.4);
       const yOff = Poses.apply(this.player, pose === "hide" ? "stand" : pose, this.player.userData.phase, { seated });
       this.player.position.y = yOff;
+      this.plumbob.visible = !this.streetCam || this.interior;
       this.plumbob.rotation.y += realDt * 2;
       this.plumbob.position.y = 2.15 + Math.sin(this.time * 2.4) * 0.06;
       const mood = this.sim.mood();
@@ -1200,6 +1210,12 @@
         const k = Math.pow(Math.max(this.room.w / 12, this.room.d / 10), 0.85) * this.zoom * fit;
         base = new THREE.Vector3(6, 13, 13.5).multiplyScalar(k);
         look = new THREE.Vector3(lerp(tgt.x, 0, 0.45), 0.6, lerp(tgt.z, ROOM_Z, 0.45));
+      } else if (this.streetCam) {
+        // Street view: low behind your back, turning as you turn.
+        if (moving) { const want = this.player.rotation.y + Math.PI; let dd = want - this.camYaw; while (dd > Math.PI) dd -= Math.PI * 2; while (dd < -Math.PI) dd += Math.PI * 2; this.camYawTarget = this.camYaw + dd * Math.min(1, realDt * 2.2); }
+        const sk = Math.max(0.7, this.zoom);
+        base = new THREE.Vector3(0, 3.8 * sk, 9.5 * sk + 6); // the look point is 6 ahead of you
+        look = new THREE.Vector3(tgt.x - Math.sin(this.camYaw) * 6, 1.8, tgt.z - Math.cos(this.camYaw) * 6);
       } else {
         base = new THREE.Vector3(0, 34, 29).multiplyScalar(this.zoom);
         look = new THREE.Vector3(tgt.x, 1.2, tgt.z);
@@ -1502,6 +1518,7 @@
       // Traffic: more cars when traffic is heavy.
       const tl = this.sim.trafficLevel();
       const speedMul = [1.2, 1, 0.6, 0.3][tl];
+      if (this.updateTraffic) this.updateTraffic(dt);
       this.cars.forEach((car, i) => {
         car.g.visible = !this.interior && (i < 4 + tl * 2);
         const pp = this.player.position;

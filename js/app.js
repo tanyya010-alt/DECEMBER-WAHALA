@@ -1440,6 +1440,13 @@
   $("h-phone-btn").addEventListener("click", () => { if (app.panel === "phone") { closeSheet(); renderHud(true); return; } openPanel("phone"); app.phoneApp = app.sim && app.sim.s.phone.unread ? "chats" : null; refreshPanel(); renderHud(true); });
   $("h-face").addEventListener("click", () => { openPanel("me"); renderHud(true); });
   $("h-zone").addEventListener("click", () => { openPanel("map"); renderHud(true); });
+  $("h-cam").addEventListener("click", () => {
+    const w = app.world; if (!w) return;
+    if (w.interior) { toast("Street view works outside. Step out first."); return; }
+    w.streetCam = !w.streetCam; w.snapCamera = false;
+    $("h-cam").classList.toggle("on", w.streetCam);
+    toast(w.streetCam ? "👁️ Street view. Walk with WASD or the joystick; the camera follows behind you." : "🗺️ Back to the overhead view.");
+  });
   $("h-ability").addEventListener("click", () => { app.sim.useAbility(); renderHud(true); });
   $("h-clean").addEventListener("click", () => { $("hud").classList.toggle("clean"); $("h-clean").textContent = $("hud").classList.contains("clean") ? "⌄ Show goals" : "⌃ Clean screen"; });
   $("h-menu").addEventListener("click", () => {
