@@ -32,7 +32,7 @@
     kiosk: [3, 1.2], cinema: [6, 0.4], bench: [2.4, 0.7], xtree: [1.6, 1.6], rack: [4, 0.8], mirror: [1, 0.3], salonchair: [1, 1],
     dryer: [1, 2.8], treadmill: [1, 2], weights: [3.5, 1], cooler: [0.6, 0.6], altar: [3, 1.2], choir: [3, 1.4], pew: [3.6, 0.8],
     stage: [8, 2], crates: [1.6, 1.6], pool: [6, 3.6], bike: [0.7, 1.8], door: [2.2, 0.3],
-    kitchen: [9, 1.2], island: [5, 1.4], dining: [6, 1.6], winewall: [1.1, 4.6], stairs: [5, 2.6], sectional: [6, 3], bedlux: [4.4, 3.8], curvechairs: [3.6, 1.6], concierge: [0.8, 0.6],
+    kitchen: [9, 1.2], island: [5, 1.4], dining: [6, 1.6], winewall: [1.1, 4.6], stairs: [5, 2.6], sectional: [6, 3], bedlux: [4.4, 3.8], curvechairs: [3.6, 1.6], concierge: [0.8, 0.6], vitrine: [1.6, 1.2], velvet: [4, 0.4],
   };
   const WALKABLE = new Set(["dancefloor", "choir", "door", "photowall", "dancedeck"]);
 
@@ -173,10 +173,13 @@
             else P(box(0.4, 0.5, 0.4, 0xff7043), -1.2, 0.25, 0.3); // jerrycan
           }
           break;
-        case "sofa":
-          P(box(3, 0.5, 1.1, 0x8e24aa), 0, 0.45, 0);
-          P(box(3, 0.9, 0.3, 0x7b1fa2), 0, 0.9, -0.45);
-          [-1.4, 1.4].forEach((x) => P(box(0.25, 0.75, 1.1, 0x7b1fa2), x, 0.6, 0));
+        case "sofa": {
+          const lux = type === "conceptstore";
+          P(box(3, 0.5, 1.1, lux ? 0x1f1f1f : 0x8e24aa), 0, 0.45, 0);
+          P(box(3, 0.9, 0.3, lux ? 0x2a2a2a : 0x7b1fa2), 0, 0.9, -0.45);
+          [-1.4, 1.4].forEach((x) => P(box(0.25, 0.75, 1.1, lux ? 0x2a2a2a : 0x7b1fa2), x, 0.6, 0));
+          if (lux) [-0.8, 0.8].forEach((x) => P(box(0.5, 0.4, 0.14, 0xd8a93b), x, 0.85, -0.25).rotation.x = -0.2);
+        }
           break;
         case "couch":
           P(box(1.1, 0.5, 3, 0x6a1b9a), 0, 0.45, 0);
@@ -484,6 +487,28 @@
           anim.tiles.push({ mat: scr.material, kind: "tv" });
           break;
         }
+        case "vitrine": {
+          // A numbered piece under glass, lit from above.
+          P(box(1.4, 1.0, 1.0, 0xfafafa), 0, 0.5, 0);
+          P(box(1.42, 0.04, 1.02, 0xd8a93b), 0, 1.02, 0);
+          P(box(1.3, 1.0, 0.9, new THREE.MeshLambertMaterial({ color: 0xe6f4ff, transparent: true, opacity: 0.22, depthWrite: false })), 0, 1.54, 0);
+          const hue = [0x1c1c1e, 0xc9a24a, 0x2f5d8a, 0x8d1b3d][Math.abs(Math.round(o.x * 7)) % 4];
+          P(cyl(0.16, 0.2, 0.55, hue, 10), 0, 1.35, 0); P(cyl(0.22, 0.16, 0.22, hue, 10), 0, 1.7, 0); P(cyl(0.03, 0.03, 0.2, 0x9e9e9e, 5), 0, 1.15, 0);
+          const spot = glow(0x999999); anim.tiles.push({ mat: spot, kind: "led", col: 0xfff3d6, day: 0xfff3d6 });
+          P(cyl(0.12, 0.12, 0.08, spot, 10), 0, 2.08, 0); P(cyl(0.01, 0.01, 1.2, 0x333333, 3), 0, 2.7, 0);
+          P(box(0.5, 0.18, 0.02, 0x1c1c1e), 0, 0.7, 0.51);
+          break;
+        }
+        case "velvet": {
+          const xs = [-w / 2, 0, w / 2];
+          xs.forEach((x) => { P(cyl(0.05, 0.05, 1.0, 0xd8a93b, 8), x, 0.5, 0); P(sph(0.08, 0xd8a93b), x, 1.02, 0); P(cyl(0.2, 0.22, 0.05, 0xd8a93b, 12), x, 0.03, 0); });
+          for (let i = 0; i < 2; i++) {
+            const a = xs[i], b = xs[i + 1];
+            const curve = new THREE.CatmullRomCurve3([new THREE.Vector3(a, 0.95, 0), new THREE.Vector3((a + b) / 2, 0.7, 0), new THREE.Vector3(b, 0.95, 0)]);
+            P(new THREE.Mesh(new THREE.TubeGeometry(curve, 16, 0.035, 6), lam(0x8d1b3d)), 0, 0, 0);
+          }
+          break;
+        }
         case "door": {
           // A doormat with a glowing exit arrow (the front wall is cut away, Sims-style).
           P(box(2.2, 0.04, 1.1, 0x6d4c41), 0, 0.03, 0);
@@ -518,6 +543,14 @@
       else if (home.cooling >= 0) { put(cyl(0.04, 0.04, 1.4, 0x222222, 5), -1.6, 0.7, -2.2); const fan = put(cyl(0.45, 0.45, 0.08, 0x26a69a, 12), -1.6, 1.5, -2.2); fan.rotation.x = Math.PI / 2; anim.spin.push(fan); colliders.push({ x0: -1.9, x1: -1.3, z0: -2.5, z1: -1.9 }); }
       if (home.decor >= 0) put(new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.4), new THREE.MeshBasicMaterial({ map: art(["#ffb300", "#d84315", "#2e7d32", "#1565c0", "#6a1b9a"]) })), 1.6, 2.4, -RD / 2 + 0.14);
       put(box(2.6, 0.02, 2, 0xc62828), -1.2, 0.01, 2.2); // rug
+    }
+    if (type === "conceptstore") {
+      // Gold trim, a feature wall with the store mark, and track lighting.
+      const sc = document.createElement("canvas"); sc.width = 512; sc.height = 128; const sx = sc.getContext("2d");
+      sx.fillStyle = "#1c1c1e"; sx.fillRect(0, 0, 512, 128); sx.fillStyle = "#e3c47a"; sx.font = "600 44px Fredoka, system-ui, sans-serif"; sx.textAlign = "center"; sx.textBaseline = "middle"; sx.fillText("EKO · CONCEPT", 256, 66);
+      put(box(6, 1.5, 0.08, new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(sc) })), -2.2, 2.5, -RD / 2 + 0.2);
+      put(box(RW - 0.4, 0.06, 0.06, 0xd8a93b), 0, 3.1, -RD / 2 + 0.17);
+      put(box(4.6, 0.02, 3.2, 0xe9dcc5), 1.6, 0.012, 2.2);
     }
     if (["lounge", "restaurant", "hotel"].includes(type)) put(box(4, 0.02, 3, type === "lounge" ? 0x4e342e : 0x8d1b3d), -2, 0.01, 2.5);
     if (type === "church") for (let x = -RW / 2 + 2.5; x < RW / 2 - 1.5; x += 4.2) { const m = new THREE.MeshBasicMaterial({ map: art(["#1565c0", "#ffb300", "#c62828", "#2e7d32"]) }); put(new THREE.Mesh(new THREE.PlaneGeometry(1.4, 2.2), m), x, 2.2, -RD / 2 + 0.16); }

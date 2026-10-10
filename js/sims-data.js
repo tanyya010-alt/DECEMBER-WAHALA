@@ -36,6 +36,14 @@
 
   // Timed moodlets: emotion, weight and how long they last (hours).
   const MOODLETS = {
+    fit_approved: { emotion: "confident", w: 2, h: 4, label: "Fit Approved", icon: "💅🏾" },
+    cheap_fit: { emotion: "embarrassed", w: 2, h: 3, label: "Failed the Fit Check", icon: "🙈" },
+    debtor: { emotion: "tense", w: 3, h: 6, label: "Owing Money", icon: "💸" },
+    starstruck: { emotion: "playful", w: 2, h: 5, label: "Starstruck", icon: "🤩" },
+    dj_hype: { emotion: "energized", w: 2, h: 4, label: "The Crowd Went Wild", icon: "🎛️" },
+    dj_flop: { emotion: "embarrassed", w: 1, h: 2, label: "Cleared the Dance Floor", icon: "🦗" },
+    left_on_read: { emotion: "embarrassed", w: 1, h: 2, label: "Ignored by a Celeb", icon: "🫥" },
+    double_clout: { emotion: "confident", w: 1, h: 0.5, label: "Double Clout", icon: "✨" },
     ate_well: { emotion: "happy", w: 1, h: 3, label: "Ate Something Good", icon: "😋" },
     great_food: { emotion: "happy", w: 2, h: 4, label: "Party Jollof Perfection", icon: "🥘" },
     slept_well: { emotion: "energized", w: 1, h: 4, label: "Well Rested", icon: "😴" },
@@ -84,6 +92,7 @@
 
   // Moodlets that come from doing things.
   const ACTION_MOODLETS = {
+    chef_tasting: "great_food", styling_session: "fit_approved", buy_wristband: "big_spender", store_network: "flirted",
     eat_amala: "ate_well", fast_food: "ate_well", family_food: "ate_well", coffee: "ate_well", suya: "ate_well", takeaway_jollof: "ate_well",
     fine_dining: "great_food", owambe_eat: "great_food", christmas_lunch: "christmas",
     party: "partied", dance: "danced", beach_party: "partied", owambe_attend: "owambe", concert: "detty_high", vip: "big_spender",
@@ -164,6 +173,7 @@
     hustle: { name: "Hustle", icon: "💼", desc: "Gigs and deals pay more." },
   };
   const SKILL_OF = {
+    store_network: "charisma", styling_session: "photography",
     cook: "cooking", takeaway_jollof: null,
     party: "dancing", dance: "dancing", owambe_attend: "dancing", beach_party: "dancing", dance_home: "dancing", concert: "dancing",
     workout: "fitness", chores: "fitness", pool_swim: "fitness", beachclub_party: "dancing", rooftop_party: "dancing", firepit_chill: "charisma", content_shoot: "photography", penthouse_party: "charisma", wine_tasting: "charisma",
@@ -192,6 +202,7 @@
 
   // How your Sim looks while doing each action.
   const POSES = {
+    chef_tasting: "eat", styling_session: "stand", store_network: "talk", buy_wristband: "stand",
     eat_amala: "eat", fine_dining: "eat", fast_food: "eat", coffee: "eat", family_food: "eat", owambe_eat: "eat", suya: "eat", christmas_lunch: "eat",
     sleep: "lie", nap: "lie", tv: "sit", laptop_work: "sit", remote_work: "sit", work_shift: "sit", service: "sit", sunset_drinks: "sit", vip: "sit", new_hair: "sit", salon_gossip: "sit", pool_day: "lie", chill: "sit", visit_family: "sit", lobby_network: "sit", cinema: "hide", picnic: "sit",
     post_home: "phone", club_photos: "phone", beach_photos: "phone", photoshoot: "phone", collab: "phone",
@@ -326,7 +337,7 @@
       T("toilet", 6, -4, ["toilet"], { label: "Toilet", icon: "🚽" }),
     ] },
     restaurant: { w: 16, d: 12, floor: ["#3e2c23", "#4a362b"], wall: "#fff8e1", light: 0xffe6b8, objects: [
-      tableSet(-4.5, -2, ["fine_dining", "restaurant_meet"]), tableSet(0, -2, ["fine_dining", "restaurant_meet"]), tableSet(4.5, -2, ["fine_dining"]),
+      tableSet(-4.5, -2, ["chef_tasting", "fine_dining", "restaurant_meet"]), tableSet(0, -2, ["fine_dining", "restaurant_meet"]), tableSet(4.5, -2, ["chef_tasting", "fine_dining"]),
       tableSet(-2.2, 2.8, ["fine_dining", "restaurant_meet"]), tableSet(2.2, 2.8, ["fine_dining"]),
       T("bar", 6.8, 3.5, ["drinks"], { label: "Bar", icon: "🍷", w: 1.2, d: 4, seats: [[5.8, 2.4, Math.PI / 2, "sit"], [5.8, 4.4, Math.PI / 2, "sit"]] }),
       T("toilet", -7, 4.6, ["toilet"], { label: "Toilet", icon: "🚽" }),
@@ -346,6 +357,18 @@
     ] },
     // The IJGB luxury shortlet penthouse: double-height glass, glossy white floors,
     // open-plan kitchen and wine wall, floating stairs over an indoor garden.
+    // Designer concept store: numbered drops under glass, a stylist and a velvet-roped launch lounge.
+    conceptstore: { w: 16, d: 11, floor: ["#efe9df", "#e6dfd3"], wall: "#f7f3ec", light: 0xfff4e2, objects: [
+      T("vitrine", -5.4, -3.8, ["browse_drop"], { label: "Numbered drop", icon: "💎" }),
+      T("vitrine", -2.2, -3.8, ["browse_drop"], { label: "Numbered drop", icon: "💎" }),
+      T("vitrine", 1, -3.8, ["browse_drop"], { label: "Numbered drop", icon: "💎" }),
+      T("counter", 5.2, -3.6, ["buy_wristband"], { label: "Concierge desk", icon: "🎫", w: 3.4, vendorSpot: [5.2, -4.5, 0] }),
+      T("rack", -4.6, 1.2, ["browse_drop"], { label: "Limited rail", icon: "🧥", w: 4 }),
+      T("mirror", 6.9, 1.4, ["styling_session", "wardrobe"], { label: "Stylist's mirror", icon: "🪞" }),
+      T("velvet", 1.6, 0.6, ["store_network"], { label: "Velvet rope", icon: "🥂", w: 4, d: 0.4 }),
+      T("sofa", 1.6, 2.8, ["store_network", "sit_chill"], { label: "VIP launch lounge", icon: "🥂", seats: [[0.8, 2.9, 0, "sit"], [2.4, 2.9, 0, "sit"]] }),
+      T("plant", -7, 4.4, [], {}), T("plant", 7, -4.6, [], {}),
+    ] },
     shortlet: { w: 26, d: 18, glass: true, height: 5.2, floor: ["#f6f7f9", "#eef0f3"], wall: "#f7f7f5", light: 0xffffff, objects: [
       T("kitchen", 6.5, -7.9, ["chef_dinner", "cook", "snack"], { label: "Chef's kitchen", icon: "👨🏾‍🍳", w: 9, d: 1.2, vendorSpot: [6.5, -6.9, Math.PI] }),
       T("island", 6.5, -4.4, ["chef_dinner", "wine_tasting"], { label: "Kitchen island", icon: "🍸", w: 5, d: 1.4, seats: [[4.9, -3.2, Math.PI, "sit"], [6.5, -3.2, Math.PI, "sit"], [8.1, -3.2, Math.PI, "sit"]] }),
@@ -354,14 +377,14 @@
       T("stairs", -7.6, -7.2, ["content_shoot"], { label: "Floating staircase", icon: "🤳🏾", w: 5, d: 2.6 }),
       T("tv", -2.6, -4.6, ["movie_night", "tv"], { label: "Cinema screen", icon: "🎬", w: 3, d: 0.8 }),
       T("sectional", -2.6, 0.4, ["movie_night", "sit_chill", "penthouse_party"], { label: "Sectional sofa", icon: "🛋️", w: 6, d: 3, seats: [[-3.6, 0.6, Math.PI, "sit"], [-2.3, 0.6, Math.PI, "sit"], [-1.0, 0.6, Math.PI, "sit"], [0.0, 0.6, Math.PI, "sit"], [-4.7, -0.5, Math.PI / 2, "sit"]] }),
-      T("bedlux", 9.6, 6.2, ["sleep", "nap"], { label: "Master bed", icon: "🛏️", seats: [[9.6, 6.3, 0, "lie"]] }),
+      T("bedlux", 9.6, 6.2, ["sleep", "nap", "wardrobe"], { label: "Master bed", icon: "🛏️", seats: [[9.6, 6.3, 0, "lie"]] }),
       T("curvechairs", 3.6, 6.6, ["sit_chill", "content_shoot"], { label: "Lounge chairs", icon: "🛋️", w: 3.6, d: 1.6, seats: [[2.6, 6.4, Math.PI, "sit"], [4.6, 6.4, Math.PI, "sit"]] }),
       T("concierge", -1.6, 7.6, ["book_penthouse"], { label: "Concierge tablet", icon: "🔑" }),
       T("shower", -11.6, 7.4, ["shower", "toilet"], { label: "Spa bathroom", icon: "🛁" }),
     ] },
     // High-octane rooftop club and DJ hub, open to the city skyline.
     lounge: { w: 26, d: 18, open: true, setting: "rooftop", floor: ["#5c6168", "#52575e"], wall: "#6b7078", light: 0xffc46b, stringLights: true, objects: [
-      T("djstage", 0, -7.4, ["request_song"], { label: "DJ hub", icon: "🎛️", w: 8, d: 2.6, vendorSpot: [0, -7.6, 0] }),
+      T("djstage", 0, -7.4, ["dj_set", "request_song"], { label: "DJ hub", icon: "🎛️", w: 8, d: 2.6, vendorSpot: [0, -7.6, 0] }),
       T("dancedeck", 0, -3.6, ["rooftop_party", "dance", "crossover"], { label: "Dance floor", icon: "💃🏾", w: 9, d: 4, seats: [[-3, -4, 0, "dance"], [-1, -3.4, 0, "dance"], [1, -4.1, 0, "dance"], [3, -3.5, 0, "dance"], [-2, -2.4, 0, "dance"], [2, -2.5, 0, "dance"]] }),
       T("firepit", -6.5, 3.4, ["firepit_chill", "sit_chill"], { label: "Fire pit lounge", icon: "🔥", w: 4.4, d: 1.2, seats: [[-8, 1.9, 0, "sit"], [-6.5, 1.9, 0, "sit"], [-5, 1.9, 0, "sit"], [-8, 4.9, Math.PI, "sit"], [-6.5, 4.9, Math.PI, "sit"], [-5, 4.9, Math.PI, "sit"]] }),
       T("firepit", 5.5, 4.6, ["firepit_chill", "sunset_drinks", "lounge_network"], { label: "Fire pit lounge", icon: "🔥", w: 4.4, d: 1.2, seats: [[4, 3.1, 0, "sit"], [5.5, 3.1, 0, "sit"], [7, 3.1, 0, "sit"], [4, 6.1, Math.PI, "sit"], [5.5, 6.1, Math.PI, "sit"], [7, 6.1, Math.PI, "sit"]] }),
@@ -445,7 +468,7 @@
       T("cabana", 11.5, 4.5, ["vip_cabana", "daybed_lounge"], { label: "VIP cabana", icon: "🍾", seats: [[11.9, 4.4, -Math.PI / 2, "sit"], [11.1, 5.0, -Math.PI / 2, "sit"]] }),
       T("pergola", 10, -4.5, ["sundowner", "sit_chill", "lounge_network"], { label: "Pergola lounge", icon: "🌅", seats: [[8.3, -5.6, 0, "sit"], [9.6, -5.6, 0, "sit"], [10.9, -5.6, 0, "sit"], [12.1, -4.4, -Math.PI / 2, "sit"]] }),
       T("glowbar", 0, -8, ["drinks", "sundowner", "beach_brunch"], { label: "Beach bar", icon: "🍹", w: 7, d: 1.3, seats: [[-2.4, -6.7, Math.PI, "drink"], [0, -6.7, Math.PI, "drink"], [2.4, -6.7, Math.PI, "drink"]], vendorSpot: [0, -9.1, 0] }),
-      T("dj", -7, -8, ["request_song"], { label: "DJ booth", icon: "🎧", vendorSpot: [-7, -8.9, 0] }),
+      T("dj", -7, -8, ["dj_set", "request_song"], { label: "DJ booth", icon: "🎧", vendorSpot: [-7, -8.9, 0] }),
       T("dancedeck", -5.5, -4.6, ["beachclub_party", "dance"], { label: "Dance deck", icon: "💃🏾", w: 7, d: 3.4, seats: [[-7.5, -5, 0, "dance"], [-5.6, -4.4, 0, "dance"], [-3.7, -5, 0, "dance"], [-6.6, -3.8, 0, "dance"], [-4.4, -3.6, 0, "dance"]] }),
       tableSet(5.5, 1.5, ["beach_brunch"], "Brunch table"),
       T("ringlight", -12.5, -7.8, [], { label: "Light sculpture" }),
@@ -471,6 +494,7 @@
 
   // Venue atmosphere moodlets (no timer: they last while you're there).
   const ATMOSPHERE = {
+    conceptstore: { emotion: "confident", w: 1, label: "Retail Therapy", icon: "💎" },
     club: { emotion: "playful", w: 1, label: "Party Atmosphere", icon: "🪩", night: true },
     lounge: { emotion: "energized", w: 1, label: "Rooftop Energy", icon: "🌃" },
     shortlet: { emotion: "confident", w: 1, label: "Living Large", icon: "🥂" },

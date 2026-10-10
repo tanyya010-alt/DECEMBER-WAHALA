@@ -92,6 +92,13 @@
     for (const p of Object.values(places)) if (!p.remote && p.kind === "building") svg += `<rect x="${X(p.x - p.w / 2 + 0.5)}" y="${Z(p.z - p.d / 2 + 0.5)}" width="${(p.w - 1) * 5}" height="${(p.d - 1) * 5}" rx="6" fill="${W.TYPES[p.type].color}" stroke="rgba(0,0,0,.12)"/>`;
     svg += `<text x="${X(30)}" y="${Z(-0.6)}" class="mm-water">${lagos ? "LAGOS LAGOON" : "RING ROAD PARK"}</text>`;
     svg += `<text x="360" y="${Z(G.beach[1]) + 40}" class="mm-water">${lagos ? "ATLANTIC OCEAN" : "JABI LAKE"}</text>`;
+    // The Luxury Zone: everything south of the lagoon.
+    svg += `<rect x="${X(-67.5)}" y="${Z(9.5)}" width="${135 * 5}" height="${(G.beach[1] - 9.5) * 5}" rx="18" class="mm-lux"/>`;
+    svg += `<text x="${X(-66)}" y="${Z(11.4)}" class="mm-zone">👑 ${lagos ? "VICTORIA ISLAND & EKO ATLANTIC" : "MAITAMA & WUSE II"} · LUXURY ZONE</text>`;
+    svg += `<text x="${X(-66)}" y="${Z(-3.2)}" class="mm-zone main">🛠️ MAINLAND · HUSTLE ZONE</text>`;
+    svg += `<text x="${X(0)}" y="${Z(28) + 5}" class="mm-strip">✦ THE STRIP ✦</text>`;
+    if (lagos) svg += `<text x="${X(67)}" y="${Z(G.beach[1]) + 30}" class="mm-zone eko" style="text-anchor:end">🏙️ EKO ATLANTIC ➜</text>`;
+    if (opts.celeb) svg += `<g class="mm-celeb"><circle cx="${X(opts.celeb.x)}" cy="${Z(opts.celeb.z) - 26}" r="13"/><text x="${X(opts.celeb.x)}" y="${Z(opts.celeb.z) - 21}">⭐</text><text class="nm" x="${X(opts.celeb.x)}" y="${Z(opts.celeb.z) - 44}">${esc(opts.celeb.label)}</text></g>`;
     (opts.people || []).forEach((p) => { svg += `<circle cx="${X(p.x)}" cy="${Z(p.z)}" r="7" fill="${p.color}" stroke="#fff" stroke-width="2"><title>${esc(p.label)}</title></circle>`; });
     for (const p of Object.values(places)) {
       if (p.remote) continue;
@@ -340,6 +347,7 @@
   }
   function stopGame() {
     cancelAnimationFrame(app.raf);
+    if (window.Minigames) Minigames.close();
     if (app.world) { app.world.dispose(); app.world = null; }
   }
   function loop(now) {
@@ -348,7 +356,8 @@
     app.last = now;
     const sim = app.sim;
     if (!sim || !app.world) return;
-    const paused = app.playerTalk || !$("m-menu").hidden || !$("m-help").hidden || !$("m-confirm").hidden;
+    if (sim.s.minigame && !Minigames.isOpen()) launchMinigame();
+    const paused = app.playerTalk || !!sim.s.minigame || !$("m-menu").hidden || !$("m-help").hidden || !$("m-confirm").hidden;
     if (!paused) sim.tick(dt);
     app.world.update(dt, dt);
     // Arriving by ride takes you straight inside.
@@ -360,6 +369,21 @@
     if (app.saveT > 15) { app.saveT = 0; persist(); }
     if (app.pollT > 20 && app.online && app.user) { app.pollT = 0; refreshCity(sim.s.city); pollInbox(); }
     if (sim.s.over) { persist(true); show("screen-end"); renderEnd(); }
+  }
+  // Luxury Zone mini-games pause the clock while they run.
+  function launchMinigame() {
+    const sim = app.sim, s = sim.s, g = s.minigame;
+    closePie();
+    const place = sim.places[g.place] ? sim.places[g.place].name : "";
+    const after = (good) => { renderHud(true); toast(lastLog(), good ? "good" : "bad"); };
+    if (g.kind === "dj") {
+      Minigames.open("dj", { place: esc(place), seed: Math.round(s.t) }, (acc, best) => { sim.finishDj(acc, best); after(acc >= 0.6); }, () => { sim.cancelMinigame(); renderHud(true); });
+      return;
+    }
+    const c = sim.celebDef(g.celeb);
+    if (!c) { sim.cancelMinigame(); return; }
+    Minigames.open(g.kind, { celebName: esc(c.name), celebTitle: esc(c.title), celebFace: memo("bust", c.look), meFace: memo("bust", s.look), skill: sim.skill("photography"), seed: Math.round(s.t) },
+      (q) => { sim.finishSelfie(q); after(q >= 0.34); }, () => { sim.cancelMinigame(); renderHud(true); });
   }
   async function persist(now) {
     const sim = app.sim;
@@ -394,7 +418,7 @@
     const sim = app.sim, w = app.world;
     if (!sim || !w) return;
     const s = sim.s;
-    if (app.qCur || !app.queue.length || s.activity || s.event || s.convo || s.ride || s.over || app.playerTalk) return;
+    if (app.qCur || !app.queue.length || s.activity || s.event || s.convo || s.ride || s.over || s.minigame || app.playerTalk) return;
     const it = app.queue.shift();
     app.qCur = it;
     const done = () => { if (app.qCur === it) app.qCur = null; renderHud(true); };
@@ -510,7 +534,14 @@
   function openPie(pick, x, y) {
     const sim = app.sim, s = sim.s, w = app.world;
     let title = "", sub = "", head = "", items = [];
-    if (pick.kind === "person") {
+    if (pick.kind === "person" && sim.celebDef(pick.id)) {
+      const c = sim.celebDef(pick.id), here = s.place;
+      title = `⭐ ${c.name}`; sub = c.title;
+      head = `<div class="pie-face">${memo("bust", c.look)}</div>`;
+      const go = (id) => () => enqueue({ icon: sim.actionDef(id).icon, label: sim.actionDef(id).name, go: (done) => w.walkToPerson(pick.id, () => { startAction(id); done(); }) });
+      ["celeb_selfie", "celeb_reel"].forEach((id) => { let why = here ? sim.blocked(id, here) : "Go inside first"; if (why === "You're busy") why = null; items.push({ icon: sim.actionDef(id).icon, label: id === "celeb_selfie" ? "Grab a selfie" : "Record a Reel", why, note: id === "celeb_reel" ? "3 takes · bigger boost" : "1 shot", run: go(id) }); });
+      items.push({ icon: "👋🏾", label: "Say hi", run: () => { const ok = sim.gateOk(c); sim.log(ok ? `${c.icon} ${c.name}: "Ahh, I've seen your page! Let's take a picture."` : `${c.icon} ${c.gateText}`, ok ? "good" : "bad"); if (!ok) sim.addMoodlet("left_on_read"); toast(lastLog(), ok ? "good" : "bad"); } });
+    } else if (pick.kind === "person") {
       const who = sim.who(pick.id), st = sim.whoState(pick.id);
       if (!who || !st) return;
       title = who.name;
@@ -854,7 +885,7 @@
       html += `<p class="section-title">People here</p><div class="people-row">`;
       here.forEach((pid) => {
         const who = sim.who(pid), st = sim.whoState(pid);
-        html += `<button class="person-chip" data-talk="${pid}"><span class="pc-face">${memo("bust", who.look)}</span><span><b>${esc(who.name)}</b><small>${st.met ? sim.relLevel(pid) : who.role || "Stranger"}</small></span></button>`;
+        html += `<button class="person-chip" data-talk="${pid}"><span class="pc-face">${memo("bust", who.look)}</span><span><b>${who.gate !== undefined ? "⭐ " : ""}${esc(who.name)}</b><small>${who.gate !== undefined ? esc(who.title) : st.met ? sim.relLevel(pid) : who.role || "Stranger"}</small></span></button>`;
       });
       players.forEach((pl) => { html += `<button class="person-chip real" data-player="${esc(pl.username)}"><span class="pc-face">${memo("bust", pl.look)}</span><span><b>@${esc(pl.username)}</b><small>Real player</small></span></button>`; });
       html += `</div>`;
@@ -892,6 +923,7 @@
     const why = sim.abilityBlocked();
     html += `<div class="ability"><b>${P.ability.icon} ${P.ability.name}</b><p>${esc(P.good)}</p><p class="muted-sm">${esc(P.bad)}</p><button class="btn primary" data-ability ${why ? "disabled" : ""}>${why ? esc(why) : "Use it"}</button></div>`;
     html += `<div class="stats4">${[["📱", "Clout", s.clout], ["🤝🏾", "Reputation", s.rep], ["🔗", "Connections", s.conn], ["👥", "Followers", compact(s.followers)]].map(([i, l, v]) => `<div class="stat"><small>${i} ${l}</small><b>${typeof v === "number" ? Math.round(v) : v}</b></div>`).join("")}</div>`;
+    html += luxuryCard();
     const rk = sim.s.persona === "ijgb" ? `$${Math.round(s.usd)}` : sim.s.persona === "aunty" ? `${s.gossip} pieces` : `${Math.round(s.res)} / 100`;
     html += `<div class="meter"><div class="meter-top"><span>${P.resource.icon} ${P.resource.label}</span><span>${rk}</span></div></div>`;
     if (s.persona === "hustler") html += `<div class="secretbox"><b>🤫 Your secret</b><p>${esc(P.secret)}</p><p class="muted-sm">${s.flags.bigbreak ? "🚀 You landed it." : `Build 70+ hustle and 55+ connections after the 15th. Hustle ${Math.round(s.res)}/70 · Connections ${Math.round(s.conn)}/55.`}</p></div>`;
@@ -924,6 +956,24 @@
     return ["Your Sim", html];
   }
 
+  function luxuryCard() {
+    const sim = app.sim, s = sim.s;
+    const lv = sim.standing(), pts = sim.standingPoints(), L = W.STANDING, next = L[lv + 1];
+    const pct = next ? Math.round(((pts - L[lv].min) / (next.min - L[lv].min)) * 100) : 100;
+    let html = `<div class="lux-card"><div class="lux-top"><span class="lux-ic">${L[lv].icon}</span><div><small>Social Standing · Luxury Zone</small><b>Lv ${lv} · ${L[lv].name}</b></div><em>${pts} pts</em></div>`;
+    html += `<div class="bar lux"><i style="width:${Math.max(3, pct)}%"></i></div><small class="muted-sm">${next ? `${next.min - pts} pts to ${next.icon} ${next.name} · clout, followers, numbered pieces and accessories all count` : "Top of the Island. Everybody knows your name."}</small>`;
+    const chips = [];
+    if (s.flags.debtor) chips.push(`<span class="lchip bad">💸 Debtor: ${naira(-s.naira)} owed. Hustle on the mainland (+40% gig pay)</span>`);
+    if (s.flags.clout2 > s.t) chips.push(`<span class="lchip">✨ Double clout · ${S.fmtMins(Math.round(s.flags.clout2 - s.t))}</span>`);
+    if (s.flags.zone && s.flags.zone.until > s.t) chips.push(`<span class="lchip">🎛️ Island multiplier ×${s.flags.zone.mult} · ${S.fmtMins(Math.round(s.flags.zone.until - s.t))}</span>`);
+    if (s.inventory.vip_band > 0) chips.push(`<span class="lchip">🎫 ${s.inventory.vip_band} all-access wristband${s.inventory.vip_band > 1 ? "s" : ""}</span>`);
+    if (s.celeb && s.celeb.until > s.t) { const c = sim.celebDef(s.celeb.id); chips.push(`<span class="lchip star">⭐ ${esc(c.name)} is at ${esc(sim.places[s.celeb.place].name)} now</span>`); }
+    if (chips.length) html += `<div class="lchips">${chips.join("")}</div>`;
+    const owned = Object.entries(W.ITEMS).filter(([k, it]) => it.kind === "limited" && s.inventory[k] > 0);
+    if (owned.length) html += `<div class="lux-pieces">${owned.map(([k, it]) => `<div><span>${it.icon}</span><b>${esc(it.name)}</b><small>#${String(s.limited[k] || 1).padStart(3, "0")}/${it.edition}${it.key.sponsor ? ` · ${esc(it.key.sponsor)} ${naira(it.key.pay)}/day` : ""}${it.key.invite ? " · elite invites" : ""}</small></div>`).join("")}</div>`;
+    else html += `<small class="muted-sm">No numbered pieces yet. The concept store on the Island drops limited, numbered fits that unlock sponsorships and elite invites.</small>`;
+    return html + `</div>`;
+  }
   function emoHint(id) {
     return {
       fine: "Steady. Nothing special going on.", happy: "Things land a bit better. Skills grow a little faster.", confident: "Socials succeed more often and your posts travel further.",
@@ -963,9 +1013,9 @@
     Object.entries(s.inventory).filter(([, n]) => n > 0).forEach(([k, n]) => {
       const it = W.ITEMS[k];
       if (!it) return;
-      const equipped = s.equip.shoes === k || s.equip.bag === k || s.equip.jewelry === k;
-      const verb = it.kind === "food" ? "Eat" : ["shoes", "bag", "jewelry"].includes(it.kind) ? (equipped ? (it.kind === "shoes" ? "Wearing" : "Take off") : "Wear") : it.kind === "business" ? "Sell" : null;
-      html += `<div class="inv-item"><span class="ii">${it.icon}</span><div><b>${esc(it.name)}${n > 1 ? ` ×${n}` : ""}</b><small>${{ gift: "Give it in a conversation", ticket: "Opens the door", collectible: "A December keepsake", gear: "Messages, posts, rides", food: "Eat it anywhere", shoes: equipped ? "On your feet" : "", bag: "", jewelry: "", business: "Sell at the concert grounds or beach" }[it.kind] || ""}${it.clout ? ` · ${it.clout > 0 ? "+" : ""}${it.clout} clout` : ""}</small></div>${verb ? `<button class="btn sm" data-use="${k}" ${verb === "Wearing" ? "disabled" : ""}>${verb}</button>` : ""}</div>`;
+      const equipped = s.equip.shoes === k || s.equip.bag === k || s.equip.jewelry === k || s.equip.limited === k;
+      const verb = it.kind === "food" ? "Eat" : ["shoes", "bag", "jewelry", "limited"].includes(it.kind) ? (equipped ? (it.kind === "shoes" ? "Wearing" : "Take off") : "Wear") : it.kind === "business" ? "Sell" : null;
+      html += `<div class="inv-item"><span class="ii">${it.icon}</span><div><b>${esc(it.name)}${n > 1 ? ` ×${n}` : ""}</b><small>${{ gift: "Give it in a conversation", ticket: "Opens the door", collectible: "A December keepsake", gear: "Messages, posts, rides", food: "Eat it anywhere", shoes: equipped ? "On your feet" : "", bag: "", jewelry: "", business: "Sell at the concert grounds or beach", limited: `Numbered #${String(s.limited[k] || 1).padStart(3, "0")}/${it.edition}${equipped ? " · wearing" : ""}` }[it.kind] || ""}${it.clout ? ` · ${it.clout > 0 ? "+" : ""}${it.clout} clout` : ""}</small></div>${verb ? `<button class="btn sm" data-use="${k}" ${verb === "Wearing" ? "disabled" : ""}>${verb}</button>` : ""}</div>`;
     });
     html += `</div>`;
     return ["Bag", html];
@@ -976,8 +1026,9 @@
     const pos = s.pos || sim.places[s.place || "home"].spot;
     const friends = W.NPCS.filter((n) => s.npcs[n.id].met && !n.vendor);
     const pp = sim.peoplePositions().filter((p) => friends.some((f) => f.id === p.id)).map((p) => ({ x: p.x, z: p.z, color: "#f2b632", label: sim.who(p.id).name }));
-    let html = `<div class="map-wrap">${minimap(s.city, { me: app.world && !app.world.interior ? { x: app.world.player.position.x, z: app.world.player.position.z } : pos, sel: app.mapSel, here: s.place, people: pp })}</div>`;
-    html += `<p class="muted-sm" style="margin:6px 0 0">🚦 Traffic now: <b>${sim.trafficLabel()}</b> · 🟡 friends you've met</p>`;
+    const cel = s.celeb && s.celeb.until > s.t ? s.celeb : null, cp = cel && sim.places[cel.place];
+    let html = `<div class="map-wrap">${minimap(s.city, { me: app.world && !app.world.interior ? { x: app.world.player.position.x, z: app.world.player.position.z } : pos, sel: app.mapSel, here: s.place, people: pp, celeb: cp ? { x: cp.door.x, z: cp.door.z, label: sim.celebDef(cel.id).name } : null })}</div>`;
+    html += `<p class="muted-sm" style="margin:6px 0 0">🚦 Traffic now: <b>${sim.trafficLabel()}</b> · 🟡 friends you've met${cel ? ` · ⭐ ${esc(sim.celebDef(cel.id).name)} at ${esc(cp.name)}` : ""}</p>`;
     const remote = ["airport"];
     html += `<div class="chips small-chips">${remote.map((id) => `<button data-mapsel="${id}" class="${app.mapSel === id ? "sel" : ""}">${sim.places[id].icon} ${esc(sim.places[id].name)}</button>`).join("")}</div>`;
     if (app.mapSel) {
@@ -1368,6 +1419,6 @@
   });
   window.addEventListener("beforeunload", () => { if (app.sim && !(app.online && app.user)) store.set(GUEST_KEY, app.sim.s); });
 
-  if (/[?&]debug/.test(location.search)) window.__dw = app;
+  if (/[?&]debug/.test(location.search)) { window.__dw = app; app.enterPlace = enterPlace; app.openPanel = openPanel; }
   boot();
 })();

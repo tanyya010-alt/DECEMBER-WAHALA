@@ -209,6 +209,22 @@
       this.sea.rotation.x = -Math.PI / 2;
       this.collider(0, s1 + 30, 240, 60);
       this.foam = this.add(box(150, 0.03, 0.5, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7 })), 0, 0.05, s1 + 0.4);
+      if (lagos) {
+        // Eko Atlantic: glass towers on reclaimed land, off to the south-east so
+        // they never sit between the camera and the beach.
+        this.add(box(58, 0.6, 46, lam(0xd9d2c0)), 108, 0.1, s1 + 22);
+        this.add(box(18, 0.4, 3, lam(0x9aa0a6)), 72, 0.2, s1 + 4);
+        const glassBody = [0x2f4f6f, 0x3d6a8a, 0x284057, 0x4a7896, 0x1f3346];
+        for (let i = 0; i < 18; i++) {
+          const x = 86 + (i % 6) * 7.2 + (Math.floor(i / 6) % 2) * 3, z = s1 + 6 + Math.floor(i / 6) * 12 + ((i * 7) % 3);
+          const h = 12 + ((i * 37) % 26), bw = 3.6 + (i % 3) * 1.0;
+          this.add(box(bw, h, bw, lam(glassBody[i % 5])), x, h / 2 + 0.3, z);
+          for (let f = 3; f < h - 1; f += 3.2) this.add(box(bw + 0.06, 0.5, bw + 0.06, this.windowMat), x, f, z);
+          if (i % 4 === 0) this.add(new THREE.Mesh(new THREE.SphereGeometry(0.35, 6, 5), this.bulbMat), x, h + 0.6, z);
+        }
+        const eko = this.add(new THREE.Mesh(new THREE.PlaneGeometry(14, 3.5), new THREE.MeshBasicMaterial({ map: signTexture("🏙️", "Eko Atlantic"), transparent: true })), 80, 7, s1 + 1.5);
+        eko.rotation.y = -0.5;
+      }
       if (!lagos) {
         const rock = this.add(new THREE.Mesh(new THREE.DodecahedronGeometry(30, 1), lam(0x8f8c78, { flatShading: true })), 30, 6, -95);
         rock.scale.set(1.6, 0.9, 1);
@@ -244,7 +260,7 @@
       // Trees around the blocks.
       const trees = [];
       for (const x of G.cols) for (const z of G.rows) { trees.push([x - 9.6, z - 6.6], [x + 9.6, z - 6.6]); }
-      const inClub = (x, z) => ["beachclub", "shortlet"].some((k) => { const bc = this.places[k]; return bc && Math.abs(x - bc.x) < bc.w / 2 + 2 && Math.abs(z - bc.z) < bc.d / 2 + 2; });
+      const inClub = (x, z) => ["beachclub", "shortlet", "conceptstore"].some((k) => { const bc = this.places[k]; return bc && Math.abs(x - bc.x) < bc.w / 2 + 2 && Math.abs(z - bc.z) < bc.d / 2 + 2; });
       for (let x = -64; x <= 64; x += 9) if (!inClub(x, lagos ? 59 : 60)) trees.push([x, lagos ? 59 : 60]);
       this.addTrees(trees);
       this.buildDecorations();
@@ -360,10 +376,38 @@
       [[-w / 2 - 0.6, front + 0.6], [w / 2 + 0.6, front + 0.6], [-w / 2 - 0.6, z0 + d / 2 - 0.5], [w / 2 + 0.6, z0 + d / 2 - 0.5]].forEach(([dx, z]) => this.palm(x0 + dx, z));
     }
 
+    // The designer concept store: cream stone, gold trim, glass showrooms both sides.
+    buildBoutique(p) {
+      const x0 = p.x, z0 = p.z, w = p.w - 1, d = p.d - 2, h = p.h, front = z0 - d / 2, back = z0 + d / 2;
+      const stone = lam(0xf3ede4), black = lam(0x1c1c1e), gold = lam(0xd8a93b);
+      this.add(box(p.w, 0.25, p.d, lam(0xe2dccf)), x0, 0.12, z0);
+      this.add(box(w, h, d, stone), x0, h / 2 + 0.25, z0);
+      this.add(box(w + 0.3, 0.4, d + 0.3, black), x0, h + 0.45, z0);
+      this.add(box(w + 0.32, 0.08, d + 0.32, gold), x0, h + 0.2, z0);
+      this.collider(x0, z0, w, d);
+      [front - 0.06, back + 0.06].forEach((fz, side) => {
+        this.add(box(w - 1.6, 3.2, 0.12, this.windowMat), x0, 2.0, fz);
+        for (let i = 0; i <= 4; i++) this.add(box(0.12, 3.3, 0.18, black), x0 - (w - 1.6) / 2 + i * (w - 1.6) / 4, 2.0, fz);
+        this.add(box(w - 1.2, 0.12, 1.4, black), x0, 3.75, fz + (side ? 0.7 : -0.7)); // awning
+        this.add(box(w - 1.2, 0.06, 0.06, gold), x0, 3.68, fz + (side ? 1.4 : -1.4));
+        [-2.6, 0, 2.6].forEach((dx, i) => { const m = this.add(new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.38, 1.2, 10), lam([0xc9a24a, 0x8d1b3d, 0x2f5d8a][i])), x0 + dx, 1.4, fz + (side ? -0.5 : 0.5)); void m; });
+      });
+      this.add(box(1.8, 2.8, 0.14, black), x0, 1.65, front - 0.1);
+      const s = this.add(new THREE.Mesh(new THREE.PlaneGeometry(6.5, 1.6), new THREE.MeshBasicMaterial({ map: signTexture(p.icon, p.name), transparent: true })), x0, h - 0.6, front - 0.1);
+      s.rotation.y = Math.PI;
+      const s2 = this.add(new THREE.Mesh(new THREE.PlaneGeometry(6.5, 1.6), new THREE.MeshBasicMaterial({ map: signTexture(p.icon, p.name), transparent: true })), x0, h - 0.6, back + 0.1);
+      void s2;
+      // Velvet rope and gold planters by the door.
+      [-1.6, 1.6].forEach((dx) => { this.add(new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.0, 6), gold), x0 + dx, 0.75, front - 1.2); this.add(box(0.7, 0.8, 0.7, gold), x0 + dx * 2.2, 0.65, front - 0.8); this.add(new THREE.Mesh(new THREE.IcosahedronGeometry(0.5, 0), lam(0x2f7d3c)), x0 + dx * 2.2, 1.4, front - 0.8); });
+      this.add(box(3.2, 0.06, 0.06, lam(0x8d1b3d)), x0, 1.05, front - 1.2);
+      [[-w / 2 - 0.5, front - 0.4], [w / 2 + 0.5, back]].forEach(([dx, z]) => this.palm(x0 + dx, z));
+    }
+
     buildPlace(p) {
       const T = W.TYPES[p.type];
       if (p.type === "beachclub") { this.buildBeachClub(p); return; }
       if (p.type === "shortlet") { this.buildMansion(p); return; }
+      if (p.type === "conceptstore") { this.buildBoutique(p); return; }
       const front = p.z + (p.side === "S" ? 1 : -1) * (p.d / 2);
       const dir = p.side === "S" ? 1 : -1;
       const sign = (y, w = Math.min(p.w - 1, 9)) => {
@@ -515,7 +559,7 @@
           this.add(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.5, 4), lam(0xffffff)), x, 1.25, z);
           this.add(box(0.8, 0.2, 1.9, lam(0xffffff)), x + 1, 0.3, z + 0.4);
         }
-        for (let i = 0; i < 7; i++) { const x = -58 + i * 19; if (["beachclub", "shortlet"].some((k) => { const bc = this.places[k]; return bc && Math.abs(x - bc.x) < bc.w / 2 + 2; })) continue; this.palm(x, 52.5 + (i % 2) * 1.4); }
+        for (let i = 0; i < 7; i++) { const x = -58 + i * 19; if (["beachclub", "shortlet", "conceptstore"].some((k) => { const bc = this.places[k]; return bc && Math.abs(x - bc.x) < bc.w / 2 + 2; })) continue; this.palm(x, 52.5 + (i % 2) * 1.4); }
         signPole(p.x - 21, 52);
       } else if (t === "photo") {
         const wall = this.add(new THREE.Mesh(new THREE.BoxGeometry(9, 4.5, 0.4), [lam(0xffffff), lam(0xffffff), lam(0xffffff), lam(0xffffff), new THREE.MeshBasicMaterial({ map: muralTexture() }), lam(0xffffff)]), p.x, 2.25, p.z + 1);
@@ -1051,7 +1095,9 @@
       const n = W.NPCS.find((x) => x.id === id);
       if (n) return { look: n.look, name: n.name, lite: false };
       const st = this.sim.s.strangers.find((x) => x.id === id);
-      return st ? { look: st.look, name: st.name, lite: true } : null;
+      if (st) return { look: st.look, name: st.name, lite: true };
+      const c = this.sim.celebDef(id);
+      return c ? { look: c.look, name: c.name, lite: false, celeb: c } : null;
     }
     personRec(id) {
       let rec = this.people.get(id);
@@ -1067,7 +1113,11 @@
       sh.rotation.x = -Math.PI / 2; sh.position.y = 0.02; model.add(sh);
       this.shadowify(model);
       this.scene.add(model);
-      rec = { model, name: info.name, kind: "person" };
+      rec = { model, name: info.name, kind: "person", celeb: info.celeb || null };
+      if (info.celeb) { // a gold halo ring so stars stand out in a crowd
+        const ring = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.62, 24), new THREE.MeshBasicMaterial({ color: 0xffd23b, transparent: true, opacity: 0.85, side: THREE.DoubleSide }));
+        ring.rotation.x = -Math.PI / 2; ring.position.y = 0.03; model.add(ring);
+      }
       this.people.set(id, rec);
       return rec;
     }
@@ -1410,7 +1460,8 @@
           const d = Math.hypot(pl.x - p.x, pl.z - p.z);
           if (d > 55 || d < 9) continue;
           const open = pl.kind === "building" && W.TYPES[pl.type].hours !== null ? (W.isOpen(pl.type, this.sim.s.t) ? "" : " · closed") : "";
-          show("pl:" + pl.id, pl.x, (pl.h || 2) + 3.2, pl.z, `${pl.icon} ${escapeHtml(pl.id === "home" ? "Your Flat" : pl.name)}<i>${open}</i>`, "wl-place");
+          const cel = this.sim.celebHere(pl.id), cd = cel && this.sim.celebDef(cel.id);
+          show("pl:" + pl.id, pl.x, (pl.h || 2) + 3.2, pl.z, `${pl.icon} ${escapeHtml(pl.id === "home" ? "Your Flat" : pl.name)}<i>${open}</i>${cd ? `<i class="wl-star">⭐ ${escapeHtml(cd.name)} is here</i>` : ""}`, "wl-place");
         }
       }
       for (const [id, rec] of this.people) {
@@ -1418,6 +1469,7 @@
         const d = Math.hypot(rec.model.position.x - p.x, rec.model.position.z - p.z);
         const st = this.sim.whoState(id);
         const known = rec.kind === "player" || (st && st.met) || (this.hover && this.hover.id === id);
+        if (rec.celeb) { if (d < 16) show("pp:" + id, rec.model.position.x, 3.5 + rec.model.position.y, rec.model.position.z, `⭐ ${escapeHtml(rec.name)} <i>${escapeHtml(rec.celeb.title)}</i>`, "wl-person wl-celeb"); continue; }
         if (d > (this.interior ? (known ? 9 : 4.5) : (known ? 11 : 6))) continue;
         const rel = rec.kind === "player" ? "Real player" : st && st.met ? this.sim.relLevel(id) : "";
         const mood = st && st.mood && st.mood.until > this.sim.s.t ? " 😠" : "";

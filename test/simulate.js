@@ -57,6 +57,11 @@ for (let seed = 1; seed <= RUNS; seed++) {
       g.convoSay(o.id);
       continue;
     }
+    if (s.minigame) {
+      seen.minigames = (seen.minigames || 0) + 1;
+      if (s.minigame.kind === "dj") g.finishDj(pick(100) / 100, pick(40)); else if (pick(5)) g.finishSelfie(pick(100) / 100); else g.cancelMinigame();
+      continue;
+    }
     if (s.activity || s.ride) { g.advance(30); continue; }
     const r = pick(20);
     if (r === 0) { g.s.speed = 1 + pick(3); g.advance(20 + pick(90)); continue; }
@@ -109,6 +114,9 @@ for (let seed = 1; seed <= RUNS; seed++) {
     assert(g.peoplePositions().every((p) => Number.isFinite(p.x) && Number.isFinite(p.z)), `seed ${seed}: bad person position`);
     if (steps % 97 === 0) { const st = JSON.parse(JSON.stringify(g.s)); const g2 = new Sim(st, seed); g2.rng = g.rng; Object.assign(g, { s: g2.s }); } // save/load round-trip
   }
+  if (g.s.celebState) seen.celebsMet = (seen.celebsMet || 0) + Object.values(g.s.celebState).filter((c) => c.met).length;
+  seen.limited = (seen.limited || 0) + g.limitedCount();
+  if (g.s.flags.fitDoor) seen.fitChecks = (seen.fitChecks || 0) + Object.keys(g.s.flags.fitDoor).length;
   const e = g.s.ending;
   assert(e && Number.isFinite(e.score) && e.bio, `seed ${seed}: bad ending`);
   assert(g.s.t <= END + 60, `seed ${seed}: clock ran past the end`);
@@ -125,6 +133,7 @@ console.log(`  distinct actions used: ${seen.actions.size} · story chains reach
 console.log(`  socials: ${Object.keys(seen.socials).length} kinds, ${Object.values(seen.socials).reduce((a, b) => a + b, 0)} total · approaches seen: ${seen.approaches} · furniture bought: ${seen.furniture}`);
 console.log(`  emotions felt: ${[...seen.emotions].join(", ")}`);
 console.log(`  best skill levels: ${JSON.stringify(seen.skills)}`);
+console.log(`  luxury zone: minigames ${seen.minigames || 0} · celebs met ${seen.celebsMet || 0} · numbered pieces ${seen.limited || 0} · fit checks ${seen.fitChecks || 0} · actions: ${["dj_set", "celeb_selfie", "celeb_reel", "chef_tasting", "browse_drop", "buy_wristband", "styling_session", "store_network"].filter((a) => seen.actions.has(a)).join(", ")}`);
 // Old (v3, pre-life-sim) saves load and gain the new fields.
 {
   const g = Sim.create({ name: "Old", look: { body: "woman", skin: 2, hair: "knotless", hairColour: "black", style: "glam", colour: 1, fabric: "plain" }, traits: ["foodie", "smooth"], goal: "legend", persona: "ijgb", city: "lagos", area: "lekki" }, 5);

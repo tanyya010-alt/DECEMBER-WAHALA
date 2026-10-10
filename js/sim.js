@@ -93,6 +93,11 @@
       const rng = makeRng(s.strangers.length * 977 + 13);
       while (s.strangers.length < STRANGERS) s.strangers.push(makeStranger(s.strangers.length, rng));
       s.strangers.forEach((st) => { if (st.romance === undefined) st.romance = 0; });
+      s.celebState = s.celebState || {};
+      s.limited = s.limited || {};
+      if (s.celeb === undefined) s.celeb = null;
+      if (s.minigame === undefined) s.minigame = null;
+      if (s.equip && s.equip.limited === undefined) s.equip.limited = null;
     }
 
     // ============================================================ creation
@@ -157,8 +162,16 @@
     worthRef() { return this.s.naira + this.s.usd * this.s.startFx; }
     placeName(id) { const p = this.places[id]; if (!p) return "the street"; return id === "home" ? `Your Flat, ${D.AREAS[this.s.city][this.s.area].name}` : p.name; }
     npcDef(id) { return W.NPCS.find((n) => n.id === id); }
-    who(id) { return this.npcDef(id) || this.s.strangers.find((x) => x.id === id); }
-    whoState(id) { return this.s.npcs[id] || this.s.strangers.find((x) => x.id === id); }
+    who(id) { return this.npcDef(id) || this.s.strangers.find((x) => x.id === id) || this.celebDef(id); }
+    whoState(id) {
+      const s = this.s;
+      if (s.npcs[id]) return s.npcs[id];
+      const st = s.strangers.find((x) => x.id === id);
+      if (st) return st;
+      if (!this.celebDef(id)) return undefined;
+      s.celebState = s.celebState || {};
+      return (s.celebState[id] = s.celebState[id] || { rel: 0, romance: 0, met: false, memory: [] });
+    }
     log(text, type = "info") {
       const c = this.clock();
       this.s.log.unshift({ t: this.s.t, day: c.day, time: c.label, text, type });
@@ -276,6 +289,7 @@
         if (k === "rep") n *= (this.has("peacemaker") ? 1.3 : 1) * (this.has("stingy") ? 0.8 : 1);
         if (k === "conn" && this.has("smooth")) n *= 1.25;
         if (k === "clout" && this.has("clout")) n *= 1.2;
+        if (k === "clout" || k === "followers") n *= this.gainMult();
       }
       n = Math.round(n);
       if (k === "clout") s.clout = clamp(s.clout + n, 0, 200);
@@ -337,6 +351,7 @@
       s.naira += n;
       s.stats.earned += n;
       if (kind) s.stats["earned_" + kind] = (s.stats["earned_" + kind] || 0) + n;
+      this.debtCheck();
     }
 
     // ============================================================ the clock
@@ -428,6 +443,7 @@
       if (ph.from === day) this.log(`🗓️ ${ph.name}: ${ph.blurb}`, "day");
       this.log(`📅 ${W.WEEKDAYS[W.weekday(day)]}, ${day} December · $1 = ${naira(s.fx)}`, "day");
       this.morningMessages(day);
+      this.luxuryDay(day);
     }
 
     // Things that happen on the half hour: calendar, plans, story chains, people texting.
@@ -439,6 +455,7 @@
       this.chainTimers();
       if (c.mm === 0 && c.hh >= 9 && c.hh <= 22 && this.rng() < 0.18) this.randomText();
       this.maybeApproach();
+      this.luxuryTick();
     }
 
     checkCrisis() {
@@ -530,12 +547,13 @@
     peopleAt(placeId) {
       const s = this.s;
       const out = [];
+      if (s.celeb && s.celeb.place === placeId && s.celeb.until > s.t) out.push(s.celeb.id);
       if (placeId === "shortlet" && s.activity && s.activity.id === "penthouse_party" && s.place === "shortlet") {
         // Your guests: friends you've met, plus a few people from around town.
         W.NPCS.forEach((d) => { const st = s.npcs[d.id]; if (st.met && st.arrived && !d.vendor && !d.family && st.rel >= 30) out.push(d.id); });
         s.strangers.forEach((st) => { if (st.met && out.length < 14) out.push(st.id); });
         s.strangers.forEach((st) => { if (!st.met && out.length < 10) out.push(st.id); }); // plus-ones from around town
-        return out.slice(0, 14);
+        return out.slice(0, 15);
       }
       W.NPCS.forEach((d) => { const st = s.npcs[d.id]; if (st.place === placeId && !st.move) out.push(d.id); });
       s.strangers.forEach((st) => { if (st.place === placeId && !st.move) out.push(st.id); });
@@ -573,8 +591,14 @@
         const ok = this.dressCheck("club");
         if (ok !== true) { this.log(ok, "bad"); this.remember("sule", "embarrassed"); return false; }
       }
+      if (s.flags.debtor && ["beachclub", "lounge", "conceptstore"].includes(p.type)) { this.log("🚫 Door host: \"Your card declined here last time. Settle your debt first.\" Hustle on the mainland.", "bad"); return false; }
+      if (["beachclub", "lounge"].includes(p.type) && W.isOpen(p.type, s.t)) {
+        const ok = this.doorFitCheck(placeId);
+        if (ok !== true) { this.log(ok, "bad"); return false; }
+      }
       s.place = placeId;
       s.inside = true;
+      if (s.celeb && s.celeb.place === placeId && s.celeb.until > s.t) { const c = this.celebDef(s.celeb.id); this.log(`⭐ ${c.name} (${c.title}) is here! Click them for a selfie.`, "good"); }
       if (placeId === "restaurant" || placeId === "cafe" || placeId === "lounge") {
         const crush = this.peopleAt(placeId).find((id) => this.s.npcs[id] && this.s.npcs[id].romance >= 30);
         if (crush) this.log(`💓 ${this.who(crush).name} is here.`, "good");
@@ -604,9 +628,17 @@
       if (["church", "club", "family", "lounge", "beach"].includes(p.type) && this.day() === 31 && this.clock().hh >= 22) ids.unshift("crossover");
       if (p.type === "hotel" && this.s.flags.hotelNight === this.day()) ids.unshift("sleep");
       if (p.type === "shortlet" && this.s.flags.penthouseNight === this.day()) ids.unshift("sleep");
+      if (this.celebHere(placeId)) ids.unshift("celeb_selfie", "celeb_reel");
       return ids.map((id) => ({ id, a: this.actionDef(id), why: this.blocked(id, placeId), cost: this.actionCost(id, placeId) }));
     }
-    actionDef(id) { return W.ACTIONS[id] || EXTRA_ACTIONS[id]; }
+    actionDef(id) {
+      const a = W.ACTIONS[id] || EXTRA_ACTIONS[id];
+      if (a && (id === "celeb_selfie" || id === "celeb_reel") && this.s.celeb) {
+        const c = this.celebDef(this.s.celeb.id);
+        if (c) return { ...a, name: id === "celeb_selfie" ? `Selfie with ${c.name}` : `Record a Reel with ${c.name}` };
+      }
+      return a;
+    }
     actionCost(id, placeId) {
       const a = this.actionDef(id);
       if (!a || !a.cost) return 0;
@@ -616,7 +648,7 @@
     blocked(id, placeId) {
       const s = this.s, a = this.actionDef(id), p = this.places[placeId];
       if (!a) return "Not available";
-      if (s.activity || s.ride) return "You're busy";
+      if (s.activity || s.ride || s.minigame) return "You're busy";
       const evs = this.events();
       const open = W.isOpen(p.type, s.t) || (p.type === "concert" && W.isOpen("concert", s.t)) || W.TYPES[p.type].hours === null;
       if (!open && !["sleep", "nap", "pickup", "crossover"].includes(id)) {
@@ -635,12 +667,14 @@
       if (a.premium && !["ijgb", "pikin"].includes(s.persona) && s.clout < 100 && !(s.inventory.vip_band > 0)) return "Big money only (or 100 clout)";
       if (a.needsPower && !this.hasPower()) return "No light!";
       if (a.needsBooking && s.flags.penthouseNight !== this.day()) return "Book the penthouse first";
+      const lux = this.luxuryBlock(id, a, placeId);
+      if (lux) return lux;
       if (id === "sleep" && placeId === "shortlet" && s.flags.penthouseNight !== this.day()) return "Book the penthouse first";
       if (a.needsFurniture) { const [k, min] = a.needsFurniture; if ((s.home[k] === undefined ? -1 : s.home[k]) < min) return `Needs: ${SIMS.FURNITURE[k].tiers[min].name} (Buy mode)`; }
       if (id === "toilet" && s.needs.bladder > 90) return "You don't need to go";
       if (id === "shower" && s.needs.hygiene > 92) return "You're already fresh";
       const cost = this.actionCost(id, placeId);
-      if (cost && !this.canAfford(cost)) return `Need ${naira(cost)}`;
+      if (cost && !this.canAfford(cost) && !a.credit) return `Need ${naira(cost)}`;
       if (a.fx && a.fx.energy < 0 && s.needs.energy + a.fx.energy < 0) return "Too tired";
       if (id === "sleep" && s.needs.energy > 92) return "You're not tired";
       if (id === "broker" && s.conn < 40) return "Need 40 connections";
@@ -664,14 +698,17 @@
       const a = this.actionDef(id);
       const p = this.places[placeId];
       // Instant actions open a menu instead of taking time.
-      if (["bdc", "bdcbuy", "bdcmall", "shop", "accessories", "hair"].includes(a.special)) { this.openMenu(a.special, placeId); return true; }
+      if (["bdc", "bdcbuy", "bdcmall", "shop", "accessories", "hair", "concept"].includes(a.special)) { this.openMenu(a.special, placeId); return true; }
+      if (["djgame", "selfie", "reel"].includes(a.special)) { s.minigame = { kind: a.special === "djgame" ? "dj" : a.special, place: placeId, id, celeb: s.celeb ? s.celeb.id : null, t: s.t }; return true; }
       if (a.dress === "owambe" && !["tradfusion", "afrochic"].includes(s.look.style)) this.log("👀 Aunties are looking at your outfit. No aso-ebi?", "bad");
       const cost = this.actionCost(id, placeId);
       if (cost) {
         if (s.flags.guy) { s.flags.guy = false; this.log("📞 Your guy came through. Half price!", "good"); }
-        this.pay(cost);
+        if (a.credit && !this.canAfford(cost)) { s.naira -= cost; s.stats.spentDay += cost; } else this.pay(cost);
+        if (s.naira < 0 && a.credit) this.enterDebt(cost);
       }
       if (id === "vip" && s.inventory.vip_band > 0) s.inventory.vip_band--;
+      else if (a.velvet && this.standing() < a.velvet && s.inventory.vip_band > 0) { s.inventory.vip_band--; this.log("🎫 You flashed your all-access wristband. The velvet rope opens.", "good"); }
       let mins = a.mins;
       if (id === "sleep") mins = Math.round(clamp((100 - s.needs.energy) / ((this.hasPower() ? 14 : 9) + (this.has("lazy") ? 3 : 0)) * 60, 60, 600));
       if (id === "crossover" || id === "christmas_lunch") mins = a.mins;
@@ -748,6 +785,7 @@
       mult *= (1 + this.skill("hustle") * 0.04) * (this.emoFx().pay || 1);
       if (this.has("hustlebrain")) mult *= 1.25;
       if (this.has("lazy")) mult *= 0.8;
+      if (this.s.flags.debtor && this.s.place && !this.inLuxuryZone(this.s.place)) mult *= 1.4; // emergency side-gig rates
       const pay = round100(a.gig * mult * (0.85 + this.rng() * 0.3));
       this.earn(pay, a.gigType);
       if (s.persona === "hustler") {
@@ -862,6 +900,11 @@
           this.addMemory(`🔑 Booked ${this.places.shortlet.name} for the night`);
           this.news("vip");
           return " The penthouse is yours tonight: sleep in the master bed, or throw a party.";
+        case "styled": s.flags.styled = this.day(); return " Your stylist tightened the whole look. +2 on every fit check today.";
+        case "tasting": {
+          s.flags.clout2 = s.t + 30; this.addMoodlet("double_clout");
+          return " Nine courses, gold leaf on the dessert. ✨ Double clout for the next 30 minutes — post something!";
+        }
         case "rentcar": s.flags.car = this.day(); return " The car is yours until midnight. Rides are free (traffic still applies).";
         case "loan": s.naira += 150000; s.flags.loan = 195000; return " ₦150,000 landed. ₦195,000 due before you leave December.";
         case "repay": {
@@ -952,6 +995,7 @@
       if (it.kind === "shoes") s.equip.shoes = item;
       else if (it.kind === "bag") s.equip.bag = s.equip.bag === item ? null : item;
       else if (it.kind === "jewelry") { s.equip.jewelry = s.equip.jewelry === item ? null : item; s.look.chain = s.equip.jewelry === "chain"; }
+      else if (it.kind === "limited") s.equip.limited = s.equip.limited === item ? null : item;
       else if (it.kind === "food") { s.inventory[item]--; this.applyFx(it.eat); this.log(`${it.icon} You ate the ${it.name.toLowerCase()}.`, "action"); }
       else if (it.kind === "business" && item === "merch") {
         if (!s.place || this.places[s.place].type !== "concert" && this.places[s.place].type !== "beach") { this.log("Sell merch at the concert grounds or the beach.", "bad"); return false; }
@@ -964,7 +1008,7 @@
     // Clout from what you're wearing and carrying.
     accessoryClout() {
       const e = this.s.equip;
-      return ["shoes", "bag", "jewelry"].reduce((a, k) => a + ((e[k] && W.ITEMS[e[k]].clout) || 0), 0);
+      return ["shoes", "bag", "jewelry", "limited"].reduce((a, k) => a + ((e[k] && W.ITEMS[e[k]] && W.ITEMS[e[k]].clout) || 0), 0);
     }
 
     // Menus that need a choice (shops, currency).
@@ -983,6 +1027,14 @@
         });
         choices.push({ label: "Nothing today" });
         ev = { title: "Shoes, Bags & Jewellery", icon: "👜", text: "Accessories add clout — and the bouncer checks your shoes.", choices };
+      } else if (kind === "concept") {
+        const choices = Object.entries(W.ITEMS).filter(([k, it]) => it.kind === "limited" && !(s.inventory[k] > 0)).map(([k, it]) => {
+          const d = this.dropStatus(k);
+          const keyTxt = [it.key.sponsor ? `sponsor deal: ${it.key.sponsor} ${naira(it.key.pay)}/day` : "", it.key.invite ? `${it.key.invite} elite invite${it.key.invite > 1 ? "s" : ""}` : ""].filter(Boolean).join(" + ");
+          return { label: `${it.icon} ${it.name} · #${String(d.serial).padStart(3, "0")}/${it.edition}${d.left <= 10 ? ` · only ${d.left} left!` : ""}`, note: keyTxt, cost: this.price(it.price, type), buyLimited: k, mins: 20 };
+        });
+        choices.push({ label: "Just looking" });
+        ev = { title: "The Numbered Drop", icon: "💎", text: choices.length > 1 ? "Limited, numbered pieces. They're not just clothes — each one is a networking key: brand deals, elite invites, and the celebs start noticing you." : "You've collected the whole drop. The staff now greet you by name.", choices };
       } else if (kind === "hair") {
         const choices = Object.entries(D.HAIR[s.look.body]).filter(([k]) => k !== s.look.hair).map(([k, n]) => ({ label: n, cost: this.price(25000, type), setHair: k, mins: 120 }));
         choices.push({ label: "Keep my hair" });
@@ -997,6 +1049,227 @@
         }
       }
       this.queue(ev);
+      this.flush();
+    }
+
+    // ============================================================ the Luxury Zone
+    // Victoria Island & Eko Atlantic: everything south of the lagoon.
+    celebDef(id) { return id && W.CELEBS ? W.CELEBS.find((c) => c.id === id) || null : null; }
+    celebHere(placeId) { const c = this.s.celeb; return c && c.place === placeId && c.until > this.s.t ? c : null; }
+    inLuxuryZone(placeId) { const p = this.places[placeId]; return !!p && !p.remote && p.z > 5; }
+    limitedCount() { return Object.keys(W.ITEMS).filter((k) => W.ITEMS[k].kind === "limited" && this.s.inventory[k] > 0).length; }
+    standingPoints() { const s = this.s; return Math.round(s.clout + s.followers / 250 + this.limitedCount() * 20 + this.accessoryClout() * 2); }
+    standing() { const pts = this.standingPoints(); let lv = 0; W.STANDING.forEach((st, i) => { if (pts >= st.min) lv = i; }); return lv; }
+    // Clout and follower multipliers: the chef's-table buff and a hyped DJ set.
+    gainMult() {
+      const s = this.s;
+      let m = 1;
+      if (s.flags.clout2 > s.t) m *= 2;
+      const z = s.flags.zone;
+      if (z && z.until > s.t && s.place && this.inLuxuryZone(s.place)) m *= z.mult;
+      return m;
+    }
+    gateOk(c) {
+      const s = this.s, g = c && c.gate;
+      if (!g) return true;
+      return !!((g.clout && s.clout >= g.clout) || (g.limited && this.limitedCount() >= g.limited) || (g.standing && this.standing() >= g.standing) || (g.car && s.flags.car === this.day()));
+    }
+    luxuryBlock(id, a, placeId) {
+      const s = this.s, day = this.day();
+      if (id === "celeb_selfie" || id === "celeb_reel") {
+        const here = this.celebHere(placeId);
+        if (!here) return "No celebrity here right now";
+        const c = this.celebDef(here.id);
+        if (!this.gateOk(c)) return c.gateText;
+        if ((s.flags.selfies || {})[`${here.id}:${day}:${id}`]) return "You already got that shot";
+      }
+      if (id === "dj_set" && s.flags.djDone === `${day}:${placeId}`) return "You already played a set here today";
+      if (s.flags.debtor && this.inLuxuryZone(placeId) && (a.cost || a.velvet || a.premium)) return "You're in debt: hustle on the mainland first";
+      if ((a.premium || a.velvet) && (s.flags.capped || {})[placeId] === day) return "Fit check: general area only";
+      if (a.velvet && this.standing() < a.velvet && !(s.inventory.vip_band > 0)) return `Velvet rope: wristband or ${W.STANDING[a.velvet].name} standing`;
+      return null;
+    }
+    // The door host scores your outfit for this venue.
+    fitScore(type) {
+      const s = this.s, e = s.equip, parts = [];
+      let score = 0;
+      const add = (n, t) => { score += n; parts.push(`${t} ${n >= 0 ? "+" : "−"}${Math.abs(n)}`); };
+      const table = type === "beachclub"
+        ? { resort: 3, glam: 3, y2k: 2, oldmoney: 2, afrochic: 2, allblack: 1, streetwear: 1, tradfusion: 0, christmas: 0 }
+        : { glam: 3, allblack: 3, oldmoney: 3, afrochic: 2, streetwear: 2, y2k: 1, resort: 0, tradfusion: 1, christmas: 0 };
+      add(table[s.look.style] || 0, `${D.STYLES[s.look.style].icon} ${D.STYLES[s.look.style].name}`);
+      if (!e.shoes) add(-1, "No proper shoes");
+      else if (e.shoes === "slippers") add(type === "beachclub" ? 0 : -3, "🩴 Slippers");
+      else add({ sneakers: 2, heels: 2, loafers: 2, boots: 1 }[e.shoes] || 1, `${W.ITEMS[e.shoes].icon} ${W.ITEMS[e.shoes].name}`);
+      if (e.bag) add(e.bag === "designer_bag" ? 2 : 1, `${W.ITEMS[e.bag].icon} Bag`);
+      if (e.jewelry) add(e.jewelry === "gold_watch" ? 2 : 1, `${W.ITEMS[e.jewelry].icon} ${W.ITEMS[e.jewelry].name}`);
+      if (e.limited && s.inventory[e.limited] > 0) add(3, `${W.ITEMS[e.limited].icon} Numbered piece #${String(s.limited[e.limited] || 1).padStart(3, "0")}`);
+      if (s.flags.styled === this.day()) add(2, "🪞 Styled today");
+      if (s.needs.hygiene < 30) add(-2, "🫣 Needs a shower");
+      return { score, parts };
+    }
+    doorFitCheck(placeId) {
+      const s = this.s, p = this.places[placeId], day = this.day();
+      s.flags.fitDoor = s.flags.fitDoor || {};
+      s.flags.capped = s.flags.capped || {};
+      const key = `${day}:${p.type}`;
+      if (s.flags.fitDoor[key] !== undefined) return true;
+      if (p.type === "lounge" && s.equip.shoes === "slippers") return "🩴 Door host: \"Slippers? On a rooftop? Go home and come correct.\"";
+      const f = this.fitScore(p.type);
+      s.flags.fitDoor[key] = f.score;
+      let verdict, label;
+      if (f.score >= 7) {
+        verdict = "✨ VIP-READY. They unhook the velvet rope before you even ask. \"Welcome back.\"";
+        label = "Walk in like you own the place";
+        this.addStat("clout", 4); this.applyFx({ vibes: 8 }); this.addMoodlet("fit_approved");
+      } else if (f.score >= 4) {
+        verdict = "✅ APPROVED. A small nod. You're in.";
+        label = "Walk in";
+        this.addStat("clout", 1);
+      } else {
+        verdict = "⚠️ CHEAP FIT. \"General area only.\" Someone behind you snickers. VIP tables and cabanas are off-limits today.";
+        label = "Walk in anyway (general area)";
+        s.flags.capped[placeId] = day;
+        this.addStat("clout", -4); this.addMoodlet("cheap_fit");
+      }
+      this.queue({ title: "Fit Check", icon: "📋", text: `The door host looks you up and down.\n\n${f.parts.join(" · ")}\n\nScore ${f.score} → ${verdict}`, choices: [{ label }] });
+      return true;
+    }
+    // Numbered drops: stock sells down as December goes on.
+    dropStatus(k) {
+      const it = W.ITEMS[k], day = this.day();
+      let h = 0; for (const ch of k) h = (h * 31 + ch.charCodeAt(0)) % 997;
+      const sold = Math.min(it.edition - 1, Math.floor(it.edition * Math.min(0.97, 0.3 + 0.028 * day)) + (h % 7));
+      return { serial: sold + 1, left: it.edition - sold };
+    }
+    gotLimited(k) {
+      const s = this.s, it = W.ITEMS[k], d = this.dropStatus(k);
+      s.inventory[k] = 1;
+      s.limited[k] = d.serial;
+      s.equip.limited = k;
+      const num = `#${String(d.serial).padStart(3, "0")}/${it.edition}`;
+      this.log(`💎 You copped the ${it.name} ${num}. You're wearing it.`, "good");
+      this.addMemory(`Copped a numbered ${it.name} (${num}) on Victoria Island`);
+      if (it.key.invite) { s.inventory.vip_band = (s.inventory.vip_band || 0) + it.key.invite; this.message("concierge", `Thank you for collecting ${num}. 🎫 ${it.key.invite > 1 ? `${it.key.invite} all-access wristbands are` : "An all-access wristband is"} in your bag — the velvet ropes on the Island are open to you.`); }
+      if (it.key.sponsor) this.message("brand", `Hi! ${it.key.sponsor} here. We saw you in the ${it.name} ${num} 👀 We'd love you to wear it in your posts. ${naira(it.key.pay)} a day for the rest of December. Deal? 🤝`);
+    }
+    luxuryDay(day) {
+      const s = this.s;
+      Object.keys(W.ITEMS).forEach((k) => {
+        const it = W.ITEMS[k];
+        if (it.kind !== "limited" || !(s.inventory[k] > 0)) return;
+        if (it.key.sponsor) { this.earn(it.key.pay, "sponsor"); this.log(`💼 Sponsorship: ${it.key.sponsor} paid ${naira(it.key.pay)} for wearing your ${it.name}.`, "good"); }
+      });
+      const invites = Object.keys(W.ITEMS).some((k) => W.ITEMS[k].kind === "limited" && W.ITEMS[k].key.invite && s.inventory[k] > 0);
+      if (invites && (s.inventory.vip_band || 0) < 3 && day % 2 === 0) { s.inventory.vip_band = (s.inventory.vip_band || 0) + 1; this.message("concierge", "🎫 Elite invite: you're on tonight's list. A fresh all-access wristband is in your bag."); }
+      if (s.flags.debtor) { this.addMoodlet("debtor"); this.message("bank", `Your account is ${naira(-s.naira)} overdrawn. Kindly regularise. Side gigs on the mainland (deliveries, phone sales, the bus stop) pay extra while you're owing.`); }
+    }
+    luxuryTick() {
+      const s = this.s, c = this.clock(), day = this.day();
+      if (s.flags.debtor) this.addMoodlet("debtor", 1);
+      if (s.celeb && s.celeb.until <= s.t) {
+        const d = this.celebDef(s.celeb.id);
+        if (d && s.place === s.celeb.place && s.inside) this.log(`⭐ ${d.name} just left. The energy dropped a little.`, "info");
+        s.flags.lastCeleb = s.celeb.id;
+        s.celeb = null;
+      }
+      if (s.celeb || c.mm !== 0 && c.mm !== 30) return;
+      const night = c.hh >= 11 || c.hh < 2;
+      const sure = day >= 2 && !s.flags.firstCeleb && c.hh === 19 && c.mm === 0;
+      if (!night || !(sure || this.rng() < 0.11)) return;
+      const spots = W.LUXURY_SPOTS.filter((id) => this.places[id] && (W.isOpen(this.places[id].type, s.t) || W.TYPES[this.places[id].type].hours === null) && id !== "shortlet");
+      if (!spots.length) return;
+      const pool = W.CELEBS.filter((x) => x.id !== s.flags.lastCeleb);
+      const d = pool[Math.floor(this.rng() * pool.length)];
+      const place = sure ? (spots.includes("lounge") ? "lounge" : spots[0]) : spots[Math.floor(this.rng() * spots.length)];
+      s.celeb = { id: d.id, place, until: s.t + 100 + Math.floor(this.rng() * 60) };
+      s.flags.firstCeleb = true;
+      const p = this.places[place];
+      this.log(`📸 Celebrity sighting: ${d.icon} ${d.name} just pulled up at ${p.name}! (about ${Math.round((s.celeb.until - s.t) / 60)} hours)`, "good");
+      this.message("gist", `🚨 ${d.name} (${d.title}) is at ${p.name} RIGHT NOW. Get there before they leave! 📸`);
+    }
+    debtCheck() {
+      const s = this.s;
+      if (s.flags.debtor && s.naira >= 0) {
+        s.flags.debtor = false;
+        s.moodlets = s.moodlets.filter((m) => m.id !== "debtor");
+        this.log("✅ You're out of the red. The Luxury Zone welcomes you back.", "good");
+      }
+    }
+    enterDebt(bill) {
+      const s = this.s;
+      if (s.flags.debtor) { this.log(`💸 Another bill on credit. You're now ${naira(-s.naira)} in the red.`, "bad"); return; }
+      s.flags.debtor = true;
+      this.addMoodlet("debtor");
+      this.addStat("rep", -3);
+      this.queue({ title: "Card Declined… Then \"Approved\"", icon: "💳", text: `The bill came to ${naira(bill)}. Your card went through on an overdraft and now you're ${naira(-s.naira)} in the red. Until you're back above zero, you're a Debtor: velvet ropes stay shut, the Island won't sell you anything, and the bank keeps texting. Side gigs on the mainland pay 40% extra while you're owing.`, choices: [{ label: "Me? I go hustle am back 😤" }] });
+    }
+    // Mini-game results (the renderer runs the games).
+    cancelMinigame() { this.s.minigame = null; }
+    finishDj(acc, best) {
+      const s = this.s, g = s.minigame;
+      if (!g) return;
+      s.minigame = null;
+      const day = this.day();
+      s.flags.djDone = `${day}:${g.place}`;
+      this.passTime(40);
+      this.gainSkill("dancing", 6 + acc * 8);
+      let msg;
+      if (acc >= 0.85) {
+        s.flags.zone = { mult: 2, until: s.t + 180 };
+        this.addStat("clout", 10); this.addStat("followers", 600); this.addStat("conn", 4);
+        this.applyFx({ vibes: 30, social: 15, energy: -8 }); this.addMoodlet("dj_hype");
+        msg = `🎛️ You SHUT DOWN the DJ booth (${Math.round(acc * 100)}% · best combo ${best}). Zone multiplier ×2 on clout and followers for 3 hours anywhere on the Island!`;
+        this.addMemory("Took over the DJ booth and the whole Island went wild");
+      } else if (acc >= 0.6) {
+        s.flags.zone = { mult: 1.5, until: s.t + 120 };
+        this.addStat("clout", 5); this.addStat("followers", 250);
+        this.applyFx({ vibes: 18, social: 10, energy: -6 }); this.addMoodlet("dj_hype", 2);
+        msg = `🎛️ Solid set (${Math.round(acc * 100)}% · best combo ${best}). Zone multiplier ×1.5 for 2 hours on the Island.`;
+      } else {
+        this.addStat("clout", -2); this.applyFx({ vibes: -6, energy: -6 }); this.addMoodlet("dj_flop");
+        msg = `🦗 The crowd drifted to the bar (${Math.round(acc * 100)}%). The resident DJ takes the decks back.`;
+      }
+      this.log(msg, acc >= 0.6 ? "good" : "bad");
+      this.checkAchievements();
+      this.flush();
+    }
+    finishSelfie(q) {
+      const s = this.s, g = s.minigame;
+      if (!g) return;
+      s.minigame = null;
+      const c = this.celebDef(g.celeb);
+      if (!c) return;
+      const reel = g.kind === "reel", day = this.day();
+      s.flags.selfies = s.flags.selfies || {};
+      s.flags.selfies[`${c.id}:${day}:${g.id}`] = true;
+      this.passTime(reel ? 20 : 8);
+      const st = this.whoState(c.id); st.met = true;
+      if (q < 0.34) {
+        this.addMoodlet("embarrassed_small");
+        this.applyFx({ vibes: -4 });
+        this.log(`📸 Blurry! ${c.name}'s bodyguard steps in before you can try again.`, "bad");
+        this.flush();
+        return;
+      }
+      const gain = Math.round(c.gain * q * (reel ? 1.6 : 1) * (0.85 + this.rng() * 0.3) * (1 + this.skill("photography") * 0.04));
+      const before = s.followers;
+      this.addStat("followers", gain);
+      const got = s.followers - before;
+      this.addStat("clout", Math.round((reel ? 9 : 6) * q));
+      st.rel = clamp(st.rel + 10);
+      this.addMoodlet("starstruck");
+      this.gainSkill("photography", reel ? 6 : 3);
+      s.stats.posts++;
+      s.flags.posted = day;
+      const likes = Math.round(got * (5 + this.rng() * 8));
+      const comments = [`Is that ${c.name}?! 😱`, "How did you even get this close??", q > 0.8 ? "This is so clean, wow" : "Okay this is giving fan cam 😂"];
+      s.phone.posts.unshift({ t: s.t, place: this.places[g.place].name, icon: reel ? "🎥" : "🤳🏾", likes, gain: got, comments, drama: false, style: s.look.style, celeb: c.name });
+      if (s.phone.posts.length > 20) s.phone.posts.length = 20;
+      this.log(`${reel ? "🎥 Reel" : "🤳🏾 Selfie"} with ${c.icon} ${c.name} posted: +${got.toLocaleString()} followers, ${likes.toLocaleString()} likes!`, "good");
+      this.addMemory(`Got a ${reel ? "Reel" : "selfie"} with ${c.name}`);
+      this.unlock("starstruck");
+      this.checkAchievements();
       this.flush();
     }
 
@@ -1263,6 +1536,7 @@
       if (o.give) s.inventory[o.give] = (s.inventory[o.give] || 0) + 1;
       if (o.buyStyle) { this.addStyle(o.buyStyle); this.log(`🛍️ ${D.STYLES[o.buyStyle].name} added to your wardrobe. Change at home or right here.`, "good"); }
       if (o.buyItem) { s.inventory[o.buyItem] = (s.inventory[o.buyItem] || 0) + 1; const it = W.ITEMS[o.buyItem]; if (["shoes", "bag", "jewelry"].includes(it.kind)) this.equipItem(o.buyItem); this.log(`${it.icon} Bought: ${it.name}.`, "good"); }
+      if (o.buyLimited) this.gotLimited(o.buyLimited);
       if (o.setHair) { s.look = { ...s.look, hair: o.setHair }; this.log(`💇🏾 New hair: ${D.HAIR[s.look.body][o.setHair]}.`, "good"); }
       if (o.sellUsd) { const got = o.sellUsd * o.rate; s.usd -= o.sellUsd; s.naira += got; this.log(`💱 Sold $${o.sellUsd} for ${naira(got)}.`, "good"); }
       if (o.japaCount) s.stats.japaHelped++;
@@ -1873,7 +2147,7 @@
     }
     senderName(from) {
       const n = this.npcDef(from);
-      return n ? n.name : { family: "Family Group 👨🏾‍👩🏾‍👧🏾", bank: "Naija Trust Bank", fashion: "Àṣà Fashion House", promo: "Detty Fest 🎤", agent: "Shortlet Agent 🔑", brand: "Brand Partnerships", unknown: "Unknown number" }[from] || from;
+      return n ? n.name : { family: "Family Group 👨🏾‍👩🏾‍👧🏾", bank: "Naija Trust Bank", fashion: "Àṣà Fashion House", promo: "Detty Fest 🎤", agent: "Shortlet Agent 🔑", concierge: "VI Concierge 💎", gist: "Island Gist 📸", brand: "Brand Partnerships", unknown: "Unknown number" }[from] || from;
     }
     readAll() { this.s.phone.unread = 0; this.s.phone.messages.forEach((m) => { m.read = true; }); }
     reply(msgId, i) {
