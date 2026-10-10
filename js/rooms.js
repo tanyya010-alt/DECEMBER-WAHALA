@@ -36,8 +36,24 @@
   };
   const WALKABLE = new Set(["dancefloor", "choir", "door", "photowall", "dancedeck"]);
 
+  // Your house: a multi-room home built from the catalogue items in each slot.
+  function houseTemplate(house) {
+    const C = SIMS.CATALOGUE;
+    const paint = C.PAINTS.find((p) => p.id === house.wall) || C.PAINTS[0], fl = C.FLOORS.find((f) => f.id === house.floor) || C.FLOORS[0];
+    const objects = [];
+    for (const slot in C.SLOTS) {
+      const S = C.SLOTS[slot], id = house.slots[slot];
+      if (!id || S.multi) continue;
+      const it = C.BY_ID[id];
+      if (!it || (/^no_/.test(id) && !S.act.length)) continue;
+      const [x, z, r] = S.at;
+      objects.push({ k: "item", item: id, slot, x, z, r, act: /^no_/.test(id) ? [] : S.act.slice(), label: /^no_/.test(id) ? S.name : it.name, icon: { sleep: "🛏️", kitchen: "🍳", bath: "🛁", comfort: "🛋️", fun: "📺", skills: "🎸", light: "💡", design: "🖼️" }[S.cat], seats: S.seats, walk: S.walk });
+    }
+    return { w: 20, d: 14, floor: [fl.a, fl.b], wall: paint.a, light: 0xfff0d8, house: true, objects };
+  }
+
   function build(type, opts = {}) {
-    const T = SIMS.INTERIORS[type] || SIMS.INTERIORS.home;
+    const T = type === "home" && opts.house && SIMS.CATALOGUE ? houseTemplate(opts.house) : SIMS.INTERIORS[type] || SIMS.INTERIORS.home;
     const home = opts.home || SIMS.START_HOME;
     const g = new THREE.Group();
     const RW = T.w, RD = T.d;
@@ -49,7 +65,7 @@
 
     // Floor, walls (the two facing the camera drop down, like The Sims).
     const floorMat = T.glass ? new THREE.MeshPhongMaterial({ map: tile(T.floor[0], T.floor[1], RW / 3, RD / 3), shininess: 110, specular: 0x9a9a9a })
-      : new THREE.MeshLambertMaterial({ map: T.open ? tile(T.floor[0], T.floor[1], RW / 6, RD * 1.4) : tile(T.floor[0], T.floor[1], RW / 2, RD / 2) });
+      : new THREE.MeshLambertMaterial({ map: T.open ? tile(T.floor[0], T.floor[1], RW / 6, RD * 1.4) : tile(T.floor[0], T.floor[1], T.house ? RW / 2.6 : RW / 2, T.house ? RD / 2.6 : RD / 2) });
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(RW, RD), floorMat);
     floor.rotation.x = -Math.PI / 2; floor.userData.floor = true; g.add(floor);
     put(box(RW + 0.6, 0.5, RD + 0.6, T.glass ? 0xe8e8e6 : 0x8d6e63), 0, -0.26, 0);
@@ -90,7 +106,30 @@
     colliders.push({ x0: -RW / 2 - 2, x1: RW / 2 + 2, z0: -RD / 2 - 2, z1: -RD / 2 + 0.15 }, { x0: -RW / 2 - 2, x1: -RW / 2 + 0.15, z0: -RD / 2 - 2, z1: RD / 2 + 2 }, { x0: RW / 2 - 0.15, x1: RW / 2 + 2, z0: -RD / 2 - 2, z1: RD / 2 + 2 });
     colliders.push({ x0: -RW / 2 - 2, x1: -1.1, z0: RD / 2 - 0.15, z1: RD / 2 + 2 }, { x0: 1.1, x1: RW / 2 + 2, z0: RD / 2 - 0.15, z1: RD / 2 + 2 }, { x0: -1.1, x1: 1.1, z0: RD / 2 + 0.6, z1: RD / 2 + 2 });
     // Windows on the back wall (lit venues).
-    if (!T.dark && !T.open && !T.glass) for (let x = -RW / 2 + 2.5; x < RW / 2 - 1.5; x += 4.2) put(box(1.6, 1.3, 0.05, 0xbfe3ff), x, 2.1, -RD / 2 + 0.15);
+    if (T.house) {
+      // Low partition walls between the rooms, with doorways.
+      const pw = new THREE.MeshLambertMaterial({ color: new THREE.Color(T.wall).multiplyScalar(0.94) });
+      const part = (x0, z0, x1, z1) => {
+        const w = Math.max(0.18, Math.abs(x1 - x0)), d = Math.max(0.18, Math.abs(z1 - z0));
+        put(box(w, 2.3, d, pw), (x0 + x1) / 2, 1.15, (z0 + z1) / 2);
+        put(box(w + 0.02, 0.06, d + 0.02, 0xffffff), (x0 + x1) / 2, 2.32, (z0 + z1) / 2);
+        colliders.push({ x0: Math.min(x0, x1) - 0.12, x1: Math.max(x0, x1) + 0.12, z0: Math.min(z0, z1) - 0.12, z1: Math.max(z0, z1) + 0.12 });
+      };
+      part(-10, 0, -3, 0);          // bedroom | living
+      part(-3, -7, -3, -3.3);       // bedroom | office (door below)
+      part(3.6, -7, 3.6, -4.0);     // office | kitchen
+      part(4.8, 1, 4.8, 7);         // living | bathroom
+      part(6.9, 1, 10, 1);          // kitchen | bathroom (door at x 4.8–6.9)
+      // A round grassy island under the house, like a doll's house on a lawn.
+      const lawn = put(new THREE.Mesh(new THREE.CircleGeometry(19, 56), lam(0x6f9a4e)), 0, -0.52, 0); lawn.rotation.x = -Math.PI / 2;
+      const rim = put(new THREE.Mesh(new THREE.CylinderGeometry(19, 18.4, 1.2, 56, 1, true), lam(0x557a3c)), 0, -1.1, 0); void rim;
+      [[-12.5, -4], [12.5, 3], [-11.8, 7.5], [11.6, -7], [6, 9.6]].forEach(([x, z], i) => { put(cyl(0.12, 0.18, 1.8, 0x8a6b4a, 6), x, 0.4, z); put(new THREE.Mesh(new THREE.IcosahedronGeometry(0.9 + (i % 2) * 0.3, 0), lam(i % 2 ? 0x3f8f4a : 0x58a058)), x, 1.6, z); });
+      put(box(1.2, 0.04, 3.2, 0xd9cfbf), 0, -0.46, 8.6); // front path
+      // Ceiling lights from the catalogue, repeated in every room.
+      const lid = opts.house.slots.lights, S = SIMS.CATALOGUE.SLOTS.lights;
+      if (lid && window.Furniture3D) S.at.forEach(([x, z]) => { const lg = window.Furniture3D.build(lid); lg.position.set(x, 0, z); g.add(lg); });
+    }
+    if (!T.dark && !T.open && !T.glass && !T.house) for (let x = -RW / 2 + 2.5; x < RW / 2 - 1.5; x += 4.2) put(box(1.6, 1.3, 0.05, 0xbfe3ff), x, 2.1, -RD / 2 + 0.15);
     // Skirting and a doormat.
 
     // ------------------------------------------------------------ objects
@@ -100,7 +139,11 @@
       const og = new THREE.Group();
       og.position.set(o.x, 0, o.z);
       g.add(og);
-      const [sw, sd] = SIZE[o.k] || [1, 1];
+      let [sw, sd] = SIZE[o.k] || [1, 1];
+      if (o.k === "item" && window.Furniture3D) {
+        const sz = window.Furniture3D.build(o.item).userData.size;
+        if (!sz) { o.walk = true; [sw, sd] = [1, 1]; } else [sw, sd] = Math.abs(Math.sin(o.r || 0)) > 0.7 ? [sz[1], sz[0]] : sz;
+      }
       const w = o.w || sw, d = o.d || sd;
       const P = (m, x, y, z) => put(m, x, y, z, og);
       const tier = o.furniture ? (home[o.furniture] === undefined ? -1 : home[o.furniture]) : 0;
@@ -388,6 +431,14 @@
           P(box(0.78, 0.5, 0.12, 0xffffff), 0, 0.7, -0.75).rotation.x = -0.6;
           P(new THREE.Mesh(new THREE.ConeGeometry(1.1, 0.4, 10), lam(0xffffff)), 0.9, 2.3, 0); P(cyl(0.03, 0.03, 2.2, 0xd8a93b, 5), 0.9, 1.1, 0);
           break;
+        case "item": {
+          const model = window.Furniture3D ? window.Furniture3D.build(o.item) : new THREE.Group();
+          og.add(model);
+          og.rotation.y = o.r || 0;
+          if (model.userData.spin) anim.spin.push(model.userData.spin);
+          if (model.userData.spinY) anim.spinY = (anim.spinY || []).concat([model.userData.spinY]);
+          break;
+        }
         // ---- IJGB penthouse pieces
         case "kitchen": {
           P(box(w, 0.95, d, 0xf5f5f3), 0, 0.48, 0);
@@ -534,11 +585,11 @@
       o.mesh = og;
       o.w = w; o.d = d;
       objects.push(o);
-      if (!WALKABLE.has(o.k)) colliders.push({ x0: o.x - w / 2, x1: o.x + w / 2, z0: o.z - d / 2, z1: o.z + d / 2 });
+      if (!WALKABLE.has(o.k) && !o.walk) colliders.push({ x0: o.x - w / 2, x1: o.x + w / 2, z0: o.z - d / 2, z1: o.z + d / 2 });
     }
 
-    // Home extras: cooling and wall art from Buy mode.
-    if (type === "home") {
+    // Home extras: cooling and wall art from Buy mode (the old single-room flat).
+    if (type === "home" && !T.house) {
       if (home.cooling >= 1) { put(box(1.6, 0.5, 0.35, 0xfafafa), -3.8, 2.8, -RD / 2 + 0.35); put(box(1.4, 0.06, 0.05, 0x90a4ae), -3.8, 2.6, -RD / 2 + 0.53); }
       else if (home.cooling >= 0) { put(cyl(0.04, 0.04, 1.4, 0x222222, 5), -1.6, 0.7, -2.2); const fan = put(cyl(0.45, 0.45, 0.08, 0x26a69a, 12), -1.6, 1.5, -2.2); fan.rotation.x = Math.PI / 2; anim.spin.push(fan); colliders.push({ x0: -1.9, x1: -1.3, z0: -2.5, z1: -1.9 }); }
       if (home.decor >= 0) put(new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.4), new THREE.MeshBasicMaterial({ map: art(["#ffb300", "#d84315", "#2e7d32", "#1565c0", "#6a1b9a"]) })), 1.6, 2.4, -RD / 2 + 0.14);
@@ -678,7 +729,7 @@
     }
     // Christmas from the 15th: a little tree in the corner.
     if ((opts.day || 0) >= 15 && !T.objects.some((o) => o.k === "xtree")) {
-      const tx = RW / 2 - 1.1, tz = -RD / 2 + 1.1;
+      const tx = T.house ? -0.6 : RW / 2 - 1.1, tz = T.house ? 0.9 : -RD / 2 + 1.1;
       for (let i = 0; i < 3; i++) put(new THREE.Mesh(new THREE.ConeGeometry(0.7 - i * 0.18, 0.9, 8), lam(0x1b7a3a)), tx, 0.55 + i * 0.6, tz);
       put(new THREE.Mesh(new THREE.OctahedronGeometry(0.16), glow(0xffd23b)), tx, 2.3, tz);
       colliders.push({ x0: tx - 0.7, x1: tx + 0.7, z0: tz - 0.7, z1: tz + 0.7 });
@@ -689,7 +740,7 @@
     main.position.set(0, 3.6, 0); g.add(main);
     if (T.open) { anim.night = main; [[-6, -5, 0xff4fd8], [6, -5, 0x4fc3ff], [0, 3, 0x7c4dff]].forEach(([x, z, c]) => { const l = new THREE.PointLight(c, 0, 14); l.position.set(x, 3.2, z); g.add(l); anim.lights.push(l); }); }
     if (T.dark) for (let i = 0; i < 3; i++) { const l = new THREE.PointLight(0xff3dbb, 0.9, 12); l.position.set(-3 + i * 3, 3, 0); g.add(l); anim.lights.push(l); }
-    return { group: g, colliders, objects, walls, anim, w: RW, d: RD, dark: !!T.dark, open: !!T.open, glass: !!T.glass, type };
+    return { group: g, colliders, objects, walls, anim, w: RW, d: RD, dark: !!T.dark, open: !!T.open, glass: !!T.glass, house: !!T.house, type };
   }
 
   // Animate dance floors, TVs, neon, candles and disco balls.
@@ -714,6 +765,7 @@
       else if (a.kind === "water") a.mat.color.setHSL(0.55, 0.8, 0.55 + Math.sin(t * 1.5) * 0.03);
     }
     room.anim.spin.forEach((m) => { m.rotation.y += 0.03; if (m.geometry.type === "CylinderGeometry") m.rotation.z += 0.3; });
+    (room.anim.spinY || []).forEach((m) => { m.rotation.y += 0.12; });
     if (room.anim.night) room.anim.night.intensity = 0.7 * night;
     (room.anim.flames || []).forEach((f, i) => { f.scale.set(1, 0.7 + 0.45 * Math.abs(Math.sin(t * 7 + i * 1.7)), 1); f.position.y = 0.72 + f.scale.y * 0.18; });
     (room.anim.heads || []).forEach((h) => {

@@ -36,6 +36,7 @@
 
   // Timed moodlets: emotion, weight and how long they last (hours).
   const MOODLETS = {
+    lovely_home: { emotion: "happy", w: 2, h: 1, label: "Beautiful Home", icon: "🏡" },
     stressed: { emotion: "tense", w: 2, h: 1, label: "Stressed Out", icon: "😤" },
     fomo: { emotion: "tense", w: 2, h: 6, label: "FOMO (slower energy recovery)", icon: "🥲" },
     showed_up: { emotion: "happy", w: 2, h: 4, label: "Showed Up for the Crew", icon: "🫶🏾" },

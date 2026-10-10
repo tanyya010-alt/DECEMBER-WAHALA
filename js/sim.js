@@ -11,6 +11,8 @@
   const W = isNode ? require("./world-data.js") : root.WORLD;
   const NAV = isNode ? require("./nav.js") : root.NAV;
   const SIMS = isNode ? require("./sims-data.js") : root.WORLD.SIMS;
+  if (isNode) require("./catalogue.js");
+  const CAT = () => SIMS.CATALOGUE;
 
   const DAY = W.DAY;
   const SPEEDS = [0, 1, 4, 15]; // game minutes per real second
@@ -95,6 +97,7 @@
       s.strangers.forEach((st) => { if (st.romance === undefined) st.romance = 0; });
       s.celebState = s.celebState || {};
       if (!Number.isFinite(s.stress)) s.stress = 15;
+      if (!s.house) this.migrateHouse();
       s.limited = s.limited || {};
       if (s.celeb === undefined) s.celeb = null;
       if (s.minigame === undefined) s.minigame = null;
@@ -469,6 +472,7 @@
       this.maybeApproach();
       this.luxuryTick();
       this.lekkiTick();
+      if (s.place === "home" && s.inside && s.house && this.decorScore() >= 55) this.addMoodlet("lovely_home", 1);
     }
 
     checkCrisis() {
@@ -685,6 +689,7 @@
       const lux = this.luxuryBlock(id, a, placeId);
       if (lux) return lux;
       if (id === "sleep" && placeId === "shortlet" && s.flags.penthouseNight !== this.day()) return "Book the penthouse first";
+      if (a.needsSlot && !(s.house && this.slotFilled(a.needsSlot))) return `Needs: ${CAT().SLOTS[a.needsSlot].name} (Buy mode)`;
       if (a.needsFurniture) { const [k, min] = a.needsFurniture; if ((s.home[k] === undefined ? -1 : s.home[k]) < min) return `Needs: ${SIMS.FURNITURE[k].tiers[min].name} (Buy mode)`; }
       if (id === "toilet" && s.needs.bladder > 90) return "You don't need to go";
       if (id === "shower" && s.needs.hygiene > 92) return "You're already fresh";
@@ -763,6 +768,7 @@
       if (["party", "dance", "dance_home", "owambe_attend", "beach_party", "concert"].includes(id) && fx.vibes) fx.vibes = Math.round(fx.vibes * (1 + this.skill("dancing") * 0.05));
       if (atHome && (id === "tv" || id === "dance_home") && fx.vibes) fx.vibes = Math.round(fx.vibes * (id === "tv" && s.home.tv >= 1 ? 2 : 1) * (s.home.decor >= 0 ? 1.2 : 1));
       if (atHome && id === "host" && s.home.sound >= 1 && fx.vibes) fx.vibes = Math.round(fx.vibes * 1.3);
+      if (atHome && s.house) for (const slot in s.house.slots) { const it = CAT().BY_ID[s.house.slots[slot]]; if (it && it.boost && it.boost[id]) for (const k in it.boost[id]) fx[k] = (fx[k] || 0) + it.boost[id][k]; }
       if (id !== "sleep") this.applyFx(fx);
       const mins = act ? act.end - act.start : a.mins || 0;
       this.gainSkill(SIMS.SKILL_OF[id], mins / 6);
@@ -1970,8 +1976,92 @@
     }
 
     // ============================================================ buy mode
+    // The house: one catalogue item per slot, a storage room, wall paint and floor.
+    migrateHouse() {
+      const s = this.s, C = CAT();
+      const slots = { ...C.STARTER };
+      for (const k in C.LEGACY) { const t = s.home && s.home[k]; if (t >= 0 && C.LEGACY[k][t]) { const it = C.BY_ID[C.LEGACY[k][t]]; slots[it.slot] = it.id; } }
+      s.house = { slots, storage: [], wall: "cream", floor: "terrazzo", paints: ["cream"], floors: ["terrazzo"], bought: 0 };
+      this.recomputeHome();
+    }
+    recomputeHome() {
+      const s = this.s, C = CAT();
+      const home = { bed: -1, tv: -1, stove: -1, sound: -1, power: -1, cooling: -1, mirror: -1, decor: -1 };
+      for (const slot in s.house.slots) { const it = C.BY_ID[s.house.slots[slot]]; if (it) for (const k in it.sets) home[k] = Math.max(home[k], it.sets[k]); }
+      if (home.bed < 0) home.bed = 0; if (home.stove < 0) home.stove = 0; if (home.tv < 0) home.tv = 0;
+      s.home = home;
+    }
+    slotItem(slot) { const id = this.s.house.slots[slot]; return id ? CAT().BY_ID[id] : null; }
+    slotFilled(slot) { const it = this.slotItem(slot); return !!it && !/^no_/.test(it.id); }
+    decorScore() { const C = CAT(), h = this.s.house; let d = 0; for (const slot in h.slots) { const it = C.BY_ID[h.slots[slot]]; if (it) d += it.decor; } const p = C.PAINTS.find((x) => x.id === h.wall), f = C.FLOORS.find((x) => x.id === h.floor); return d + (p && p.price ? 3 : 0) + (f ? Math.round(f.price / 30000) : 0); }
+    // Big Man prices: the richer you look, the more Lagos charges you.
+    bigManMult() { const w = this.worth(); return w >= 500e6 ? 10 : w >= 50e6 ? 3 : 1; }
+    catPrice(base) { return round100(base * this.bigManMult()); }
+    sellValue(id) { const it = CAT().BY_ID[id]; return it ? round100(it.price * 0.6) : 0; }
+    canShopHome() { return this.s.place === "home" && this.s.inside; }
+    buyItem(id) {
+      const s = this.s, it = CAT().BY_ID[id];
+      if (!it) return false;
+      if (!this.canShopHome()) { this.log("Shop for your home from inside your flat.", "bad"); return false; }
+      if (s.house.slots[it.slot] === id) return false;
+      if (s.house.storage.includes(id)) return this.placeFromStorage(id);
+      const price = this.catPrice(it.price);
+      if (!this.canAfford(price)) { this.log(`You need ${naira(price)} for the ${it.name}.`, "bad"); return false; }
+      if (price) this.pay(price);
+      this.placeIn(it);
+      s.house.bought++;
+      this.log(`🛋️ Delivered: ${it.name}${price ? ` (−${naira(price)})` : ""}. ${it.note}`, "good");
+      if (it.decor >= 5) this.applyFx({ vibes: 6 });
+      const upgraded = Object.keys(s.house.slots).filter((k) => s.house.slots[k] && s.house.slots[k] !== CAT().STARTER[k]).length;
+      if (upgraded >= 5) this.unlock("nest");
+      return true;
+    }
+    placeIn(it) {
+      const h = this.s.house, old = h.slots[it.slot];
+      if (old && old !== it.id && !/^no_/.test(old)) h.storage.push(old);
+      h.slots[it.slot] = it.id;
+      const i = h.storage.indexOf(it.id);
+      if (i >= 0) h.storage.splice(i, 1);
+      this.recomputeHome();
+    }
+    placeFromStorage(id) {
+      const it = CAT().BY_ID[id];
+      if (!it || !this.s.house.storage.includes(id)) return false;
+      if (!this.canShopHome()) { this.log("Rearrange your home from inside your flat.", "bad"); return false; }
+      this.placeIn(it);
+      this.log(`📦 Placed your ${it.name} back in the ${CAT().SLOTS[it.slot].room.toLowerCase()}.`, "good");
+      return true;
+    }
+    sellItem(id) {
+      const s = this.s, h = s.house, it = CAT().BY_ID[id];
+      const i = h.storage.indexOf(id);
+      if (!it || i < 0) return false;
+      h.storage.splice(i, 1);
+      const got = this.sellValue(id);
+      if (got) this.earn(got, "sale");
+      this.log(`💸 Sold your ${it.name} for ${naira(got)} (60% of list price).`, got ? "good" : "info");
+      return true;
+    }
+    buyDesign(kind, id) {
+      const s = this.s, h = s.house, C = CAT();
+      const list = kind === "wall" ? C.PAINTS : C.FLOORS, owned = kind === "wall" ? h.paints : h.floors;
+      const d = list.find((x) => x.id === id);
+      if (!d) return false;
+      if (!this.canShopHome()) { this.log("Redecorate from inside your flat.", "bad"); return false; }
+      if (!owned.includes(id)) {
+        const price = this.catPrice(d.price);
+        if (!this.canAfford(price)) { this.log(`You need ${naira(price)} for ${d.name}.`, "bad"); return false; }
+        if (price) this.pay(price);
+        owned.push(id);
+      }
+      h[kind] = id;
+      this.log(`🎨 ${kind === "wall" ? "Walls painted" : "New floor"}: ${d.name}.`, "good");
+      return true;
+    }
     furnitureTier(kind) { const v = this.s.home[kind]; return v === undefined ? -1 : v; }
     buyFurniture(kind, tier) {
+      const C = CAT(), id = C.LEGACY[kind] && C.LEGACY[kind][tier];
+      if (id && C.BY_ID[id]) { if (this.furnitureTier(kind) >= tier) return false; return this.buyItem(id); }
       const s = this.s, F = SIMS.FURNITURE[kind];
       if (!F || !F.tiers[tier]) return false;
       if (!(s.place === "home" && s.inside)) { this.log("Shop for your home from inside your flat.", "bad"); return false; }

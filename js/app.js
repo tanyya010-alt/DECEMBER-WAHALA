@@ -925,6 +925,8 @@
     if (app.pressing && p && !$("sheet").hidden) return;
     $("sheet").hidden = !p;
     $("sheet").classList.toggle("phone", p === "phone");
+    $("sheet").classList.toggle("catalogue", p === "buy");
+    $("sheet").classList.toggle("collapsed", p === "buy" && !!app.buyHide);
     document.querySelectorAll("#h-nav button").forEach((b) => b.classList.toggle("sel", b.dataset.panel === (p || "")));
     if (!p) return;
     const fn = { place: panelPlace, me: panelMe, bag: panelBag, map: panelMap, phone: panelPhone, buy: panelBuy }[p];
@@ -939,6 +941,7 @@
       if (inner2) inner2.scrollTop = isc;
       $("sheet-body").dataset.html = html;
       $("sheet-body").scrollTop = sc;
+      if (window.Furniture3D) $("sheet-body").querySelectorAll("img[data-thumb]").forEach((img) => { const u = Furniture3D.thumb(img.dataset.thumb); if (u) img.src = u; else img.closest(".cat-pic").classList.add("empty"); });
     }
   }
 
@@ -1056,21 +1059,41 @@
     }[id] || "";
   }
   // Buy mode: upgrade your flat. Furniture shows up in your room right away.
+  // Buy mode: the catalogue. Every item has a slot in the house; buying sends
+  // the old one to Storage. Prices rise for big men; selling pays 60%.
   function panelBuy() {
-    const sim = app.sim, s = sim.s;
-    const atHome = s.place === "home" && s.inside;
-    let html = `<p class="muted-sm" style="margin:0">${atHome ? "Upgrades are delivered instantly and show up in your flat." : "Go home to shop for your flat."} You have <b>${naira(s.naira)}</b>${s.usd ? ` and $${Math.round(s.usd)}` : ""}.</p>`;
-    Object.entries(SIMS.FURNITURE).forEach(([k, F]) => {
-      const cur = sim.furnitureTier(k);
-      html += `<div class="buy-row"><div class="buy-head"><span class="bi">${F.icon}</span><div><b>${F.name}</b><small>${cur >= 0 ? "You have: " + esc(F.tiers[cur].name) : "You don't have one"}</small></div></div><div class="buy-tiers">`;
-      F.tiers.forEach((t, i) => {
-        const owned = i <= cur;
-        const afford = sim.canAfford(t.price);
-        html += `<button class="buy-tier${owned ? " owned" : ""}" data-buy="${k}" data-tier="${i}" ${owned || !atHome || !afford ? "disabled" : ""}><b>${esc(t.name)}</b><small>${esc(t.note)}</small><em>${owned ? "✓ Owned" : t.price ? naira(t.price) : "Free"}</em></button>`;
+    const sim = app.sim, s = sim.s, C = SIMS.CATALOGUE;
+    const atHome = sim.canShopHome();
+    const mult = sim.bigManMult();
+    const cat = app.buyCat || "sleep";
+    let html = `<div class="cat-top"><div class="cat-banner${mult > 1 ? " big" : ""}">${mult > 1 ? `🎩 Big Man prices ×${mult}: you're at the VIP table (net worth ${mult >= 10 ? "₦500m" : "₦50m"}+).` : "🏷️ Normal list prices."} Selling pays 60% of the normal list price.</div>`;
+    html += `<div class="cat-meta"><span>💰 ${naira(s.naira)}</span><span>🎨 Décor ${sim.decorScore()}</span>${atHome ? "" : `<span class="warn">🏠 Go home to buy or rearrange</span>`}<button class="btn sm ghost" data-buyhide>${app.buyHide ? "Show" : "Hide"}</button></div>`;
+    html += `<div class="cat-tabs" data-keep-scroll-x>${C.CATS.map((c) => `<button class="cat-tab${cat === c.id ? " sel" : ""}${c.id === "storage" ? " store" : c.id === "design" ? " design" : ""}" data-buycat="${c.id}">${c.icon} ${c.name}${c.id === "storage" ? ` (${s.house.storage.length})` : ""}</button>`).join("")}</div></div>`;
+    if (app.buyHide) return ["Catalogue", html];
+    const card = (it, extra) => {
+      const placed = s.house.slots[it.slot] === it.id, stored = s.house.storage.includes(it.id);
+      const price = sim.catPrice(it.price);
+      const tag = placed ? `<em class="on">On now</em>` : stored ? `<em class="own">In storage · place free</em>` : `<em>${price ? naira(price) : "Free"}</em>`;
+      return `<button class="cat-card${placed ? " on" : ""}" data-catbuy="${it.id}" ${placed || !atHome || (!stored && price && !sim.canAfford(price)) ? "disabled" : ""} title="${esc(it.note)}"><span class="cat-pic"><img data-thumb="${it.id}" alt="">${it.decor ? `<i class="decor">🎨 ${it.decor}</i>` : ""}</span><b>${esc(it.name)}</b>${tag}<small>${esc(it.note)}</small>${extra || ""}</button>`;
+    };
+    if (cat === "storage") {
+      if (!s.house.storage.length) html += `<p class="muted-sm">Storage is empty. When you buy something new, the old piece comes here: place it back for free or sell it for 60% of its list price.</p>`;
+      else html += `<div class="cat-grid">${s.house.storage.map((id) => { const it = C.BY_ID[id]; return `<div class="cat-card store"><span class="cat-pic"><img data-thumb="${id}" alt="">${it.decor ? `<i class="decor">🎨 ${it.decor}</i>` : ""}</span><b>${esc(it.name)}</b><small>${esc(C.SLOTS[it.slot].room)} · ${esc(C.SLOTS[it.slot].name)}</small><span class="cat-btns"><button class="btn sm primary" data-catplace="${id}" ${atHome ? "" : "disabled"}>Place</button><button class="btn sm" data-catsell="${id}">${sim.sellValue(id) ? `Sell ${naira(sim.sellValue(id))}` : "Throw away"}</button></span></div>`; }).join("")}</div>`;
+    } else if (cat === "design") {
+      const sw = (kind, d) => { const owned = (kind === "wall" ? s.house.paints : s.house.floors).includes(d.id), on = s.house[kind] === d.id; const price = sim.catPrice(d.price);
+        return `<button class="swatch${on ? " on" : ""}" data-catdesign="${kind}:${d.id}" ${on || !atHome || (!owned && price && !sim.canAfford(price)) ? "disabled" : ""}><span class="sw ${kind}" style="--a:${d.a};--b:${d.b}"></span><b>${esc(d.name)}</b><em class="${on ? "on" : owned ? "own" : ""}">${on ? "On now" : owned ? "Owned · free" : price ? naira(price) : "Free"}</em></button>`; };
+      html += `<p class="cat-sec">Wall paint</p><div class="cat-grid sw4">${C.PAINTS.map((d) => sw("wall", d)).join("")}</div>`;
+      html += `<p class="cat-sec">Floor</p><div class="cat-grid sw4">${C.FLOORS.map((d) => sw("floor", d)).join("")}</div>`;
+      html += `<p class="cat-sec">Wall art</p><div class="cat-grid">${C.ITEMS.filter((it) => it.slot === "art" && it.price).map((it) => card(it)).join("")}</div>`;
+    } else {
+      const slots = Object.keys(C.SLOTS).filter((k) => C.SLOTS[k].cat === cat);
+      slots.forEach((k) => {
+        const S = C.SLOTS[k], items = C.ITEMS.filter((it) => it.slot === k && !/^no_/.test(it.id));
+        const cur = sim.slotItem(k);
+        html += `<p class="cat-sec">${esc(S.name)} <small>${esc(S.room)}${cur && !/^no_/.test(cur.id) ? ` · now: ${esc(cur.name)}` : " · empty"}</small></p><div class="cat-grid">${items.map((it) => card(it)).join("")}</div>`;
       });
-      html += `</div></div>`;
-    });
-    return ["🛋️ Buy Mode", html];
+    }
+    return ["Catalogue", html];
   }
 
   function panelBag() {
@@ -1412,6 +1435,12 @@
       return;
     }
     if (d.buy) { if (sim.buyFurniture(d.buy, Number(d.tier))) toast(lastLog(), "good"); refreshPanel(); renderHud(true); return; }
+    if (d.buycat) { app.buyCat = d.buycat; app.buyHide = false; $("sheet-body").scrollTop = 0; refreshPanel(); return; }
+    if (d.buyhide !== undefined) { app.buyHide = !app.buyHide; refreshPanel(); return; }
+    if (d.catbuy) { const ok = sim.buyItem(d.catbuy); toast(lastLog(), ok ? "good" : "bad"); refreshPanel(); renderHud(true); return; }
+    if (d.catplace) { const ok = sim.placeFromStorage(d.catplace); toast(lastLog(), ok ? "good" : "bad"); refreshPanel(); renderHud(true); return; }
+    if (d.catsell) { const ok = sim.sellItem(d.catsell); toast(lastLog(), ok ? "good" : "bad"); refreshPanel(); renderHud(true); return; }
+    if (d.catdesign) { const [k, id] = d.catdesign.split(":"); const ok = sim.buyDesign(k, id); toast(lastLog(), ok ? "good" : "bad"); refreshPanel(); renderHud(true); return; }
     if (d.talk) { closeSheet(); openPie({ kind: "person", id: d.talk }, window.innerWidth / 2, window.innerHeight / 2); return; }
     if (d.player) { openPlayer(d.player); return; }
     if (d.ability !== undefined) { sim.useAbility(); renderHud(true); return; }

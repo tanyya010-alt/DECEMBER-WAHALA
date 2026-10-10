@@ -752,7 +752,7 @@
       if (!pl || pl.kind !== "building") return;
       this.disposeRoom();
       const s = this.sim.s;
-      const room = Rooms.build(pl.type, { home: s.home, day: this.sim.day() });
+      const room = Rooms.build(pl.type, { home: s.home, house: s.house, day: this.sim.day() });
       room.group.position.set(0, 0, ROOM_Z);
       this.scene.add(room.group);
       if (this.shadows) room.group.traverse((o) => { if (o.isMesh) { o.castShadow = !o.userData.floor && !o.userData.wall; o.receiveShadow = true; } });
@@ -776,7 +776,7 @@
       this.room = room;
       this.interior = true;
       this.interiorPlace = placeId;
-      this.homeKey = placeId === "home" ? JSON.stringify(s.home) : null;
+      this.homeKey = placeId === "home" ? JSON.stringify([s.home, s.house]) : null;
       this.cityGroup.visible = false;
       this.assign.clear();
       this.buildStaff();
@@ -1036,7 +1036,7 @@
         this.sim.setPos(p.door.x, p.door.z + dz);
         this.snapCamera = true;
         if (this.hooks.onRoom) this.hooks.onRoom(false, id);
-      } else if (this.interiorPlace === "home" && this.homeKey !== JSON.stringify(s.home) && !s.activity) {
+      } else if (this.interiorPlace === "home" && this.homeKey !== JSON.stringify([s.home, s.house]) && !s.activity) {
         const pos = this.player.position.clone();
         this.enterRoom("home", true);
         this.player.position.copy(pos);
@@ -1206,7 +1206,7 @@
           m.position.y = (wl.h * m.scale.y) / 2;
         });
         const c = this.sim.clock(), hr = c.hh + c.mm / 60;
-        Rooms.animate(this.room, this.time, this.room.open || this.room.glass ? 1 - daylight(hr) : 1);
+        Rooms.animate(this.room, this.time, this.room.open || this.room.glass || this.room.house ? 1 - daylight(hr) : 1);
       }
 
       this.updatePeople(realDt);
@@ -1457,7 +1457,7 @@
       const s = this.sim.s;
       const c = this.sim.clock();
       const h = c.hh + c.mm / 60;
-      const openAir = this.interior && this.room && (this.room.open || this.room.glass);
+      const openAir = this.interior && this.room && (this.room.open || this.room.glass || this.room.house);
       const sky = this.interior && !openAir ? new THREE.Color(0x1d1a24) : skyAt(h);
       this.scene.background = sky;
       this.scene.fog.color = sky;

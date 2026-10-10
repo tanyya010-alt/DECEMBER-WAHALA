@@ -27,7 +27,7 @@ for (const [t, T] of Object.entries(W.TYPES)) for (const a of T.actions) assert(
 
 for (let seed = 1; seed <= RUNS; seed++) {
   let x = seed * 7919;
-  const pick = (n) => { x = (x * 1103515245 + 12345) % 2147483648; return x % n; };
+  const pick = (n) => { x = (x * 1103515245 + 12345) % 2147483648; return Math.floor((x / 2147483648) * n); }; // high bits: the low bits of this LCG cycle
   const city = seed % 2 ? "lagos" : "abuja";
   const areas = Object.keys(D.AREAS[city]);
   const body = seed % 3 ? "woman" : "man";
@@ -102,6 +102,12 @@ for (let seed = 1; seed <= RUNS; seed++) {
       const kinds = Object.keys(SIMS.FURNITURE);
       const k = kinds[pick(kinds.length)];
       if (g.buyFurniture(k, g.furnitureTier(k) + 1)) seen.furniture++;
+      // Catalogue: buy, rearrange, sell and redecorate.
+      const C = SIMS.CATALOGUE, it = C.ITEMS[pick(C.ITEMS.length)];
+      if (g.buyItem(it.id)) seen.catalogue = (seen.catalogue || 0) + 1;
+      if (s.house.storage.length && pick(2)) { const sid = s.house.storage[pick(s.house.storage.length)]; if (pick(2)) g.sellItem(sid); else g.placeFromStorage(sid); }
+      if (!pick(4)) g.buyDesign(pick(2) ? "wall" : "floor", (pick(2) ? C.PAINTS : C.FLOORS)[pick(5)].id);
+      assert(Object.values(s.home).every(Number.isFinite), `seed ${seed}: bad home levels`);
     }
     if (s.approach) seen.approaches++;
     seen.emotions.add(g.emotion().id);
@@ -147,4 +153,5 @@ console.log(`  luxury zone: minigames ${seen.minigames || 0} · celebs met ${see
   const g2 = new Sim(st, 5);
   assert(g2.s.strangers.length === 30 && g2.s.home && g2.s.skills && Number.isFinite(g2.s.needs.bladder) && g2.emotion().id, "migration failed");
   console.log("  old save migration: ok");
+console.log(`  catalogue: ${SIMS.CATALOGUE.ITEMS.length} items, ${seen.catalogue || 0} bought by bots`);
 }
