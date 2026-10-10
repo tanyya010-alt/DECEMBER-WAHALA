@@ -94,6 +94,7 @@
       while (s.strangers.length < STRANGERS) s.strangers.push(makeStranger(s.strangers.length, rng));
       s.strangers.forEach((st) => { if (st.romance === undefined) st.romance = 0; });
       s.celebState = s.celebState || {};
+      if (!Number.isFinite(s.stress)) s.stress = 15;
       s.limited = s.limited || {};
       if (s.celeb === undefined) s.celeb = null;
       if (s.minigame === undefined) s.minigame = null;
@@ -240,7 +241,7 @@
     gainSkill(k, xp) {
       if (!k || !SIMS.SKILLS[k] || !(xp > 0)) return;
       const s = this.s, fx = this.emoFx();
-      let mult = fx.xp || 1;
+      let mult = (fx.xp || 1) * (s.stress >= 70 ? 0.8 : 1);
       if (fx.xpSkill && fx.xpSkill[k]) mult *= fx.xpSkill[k];
       if (k === "cooking" && s.home.stove >= 2 && s.place === "home") mult *= 2;
       if (k === "charisma" && this.has("smooth")) mult *= 1.25;
@@ -392,7 +393,7 @@
     sleepRate() {
       const s = this.s;
       const bed = s.place === "home" ? [1, 1.3, 1.5][s.home.bed] || 1 : s.place === "hotel" ? 1.4 : s.place === "shortlet" ? 1.6 : 1;
-      return ((this.hasPower() ? 14 : 9) + (this.has("lazy") ? 3 : 0)) * bed;
+      return ((this.hasPower() ? 14 : 9) + (this.has("lazy") ? 3 : 0)) * bed * (this.hasMoodlet("fomo") ? 0.75 : 1) * (s.stress >= 85 ? 0.85 : 1);
     }
     decay(m) {
       const s = this.s, h = m / 60, N = SIMS.NEEDS, n = s.needs;
@@ -413,6 +414,17 @@
         else dec("social", N.social.decay * (this.has("smooth") ? 1.2 : 1));
       }
       if (!this.hasPower() && s.place === "home" && s.inside) dec("vibes", 1.5);
+      // Stress drifts with your life: sleep and chilling melt it, debt and misery build it.
+      let ds = 0;
+      if (sleeping) ds -= 7;
+      else {
+        if (n.vibes > 60) ds -= 1.2;
+        if (n.vibes < 30) ds += 1.5;
+        if (n.energy < 20) ds += 1;
+        if (s.activity && ["sit", "lie", "swim"].includes(s.activity.pose)) ds -= 2;
+      }
+      if (s.naira < 0) ds += 2;
+      s.stress = clamp((Number.isFinite(s.stress) ? s.stress : 15) + ds * h);
       if (s.moodlets.length > 6) s.moodlets = s.moodlets.filter((x) => x.until > s.t);
     }
 
@@ -456,6 +468,7 @@
       if (c.mm === 0 && c.hh >= 9 && c.hh <= 22 && this.rng() < 0.18) this.randomText();
       this.maybeApproach();
       this.luxuryTick();
+      this.lekkiTick();
     }
 
     checkCrisis() {
@@ -548,6 +561,7 @@
       const s = this.s;
       const out = [];
       if (s.celeb && s.celeb.place === placeId && s.celeb.until > s.t) out.push(s.celeb.id);
+      for (const pl of s.plans || []) if (pl.kind === "fomo" && pl.status === "pending" && pl.place === placeId && s.t >= pl.start && s.t <= pl.end && !out.includes(pl.npc)) out.push(pl.npc);
       if (placeId === "shortlet" && s.activity && s.activity.id === "penthouse_party" && s.place === "shortlet") {
         // Your guests: friends you've met, plus a few people from around town.
         W.NPCS.forEach((d) => { const st = s.npcs[d.id]; if (st.met && st.arrived && !d.vendor && !d.family && st.rel >= 30) out.push(d.id); });
@@ -598,6 +612,7 @@
       }
       s.place = placeId;
       s.inside = true;
+      this.maybeChanceEncounter(placeId, 0.3);
       if (s.celeb && s.celeb.place === placeId && s.celeb.until > s.t) { const c = this.celebDef(s.celeb.id); this.log(`⭐ ${c.name} (${c.title}) is here! Click them for a selfie.`, "good"); }
       if (placeId === "restaurant" || placeId === "cafe" || placeId === "lounge") {
         const crush = this.peopleAt(placeId).find((id) => this.s.npcs[id] && this.s.npcs[id].romance >= 30);
@@ -785,6 +800,7 @@
       mult *= (1 + this.skill("hustle") * 0.04) * (this.emoFx().pay || 1);
       if (this.has("hustlebrain")) mult *= 1.25;
       if (this.has("lazy")) mult *= 0.8;
+      if (this.s.stress >= 70) mult *= 0.85; // stress hurts performance
       if (this.s.flags.debtor && this.s.place && !this.inLuxuryZone(this.s.place)) mult *= 1.4; // emergency side-gig rates
       const pay = round100(a.gig * mult * (0.85 + this.rng() * 0.3));
       this.earn(pay, a.gigType);
@@ -900,6 +916,11 @@
           this.addMemory(`🔑 Booked ${this.places.shortlet.name} for the night`);
           this.news("vip");
           return " The penthouse is yours tonight: sleep in the master bed, or throw a party.";
+        case "houseparty": {
+          this.addMemory(`🏠 Crashed a house party on ${this.places[placeId].name} · ${this.day()} Dec`);
+          if (this.rng() < 0.5) this.maybeChanceEncounter(placeId, 1, true);
+          return pick([" The DJ was somebody's cousin. Still a banger.", " Somebody's aunty called the police twice. Nobody left.", " Jollof in coolers, music to the ceiling. Peak Lekki."]);
+        }
         case "styled": s.flags.styled = this.day(); return " Your stylist tightened the whole look. +2 on every fit check today.";
         case "tasting": {
           s.flags.clout2 = s.t + 30; this.addMoodlet("double_clout");
@@ -921,7 +942,7 @@
         case "pray": if (this.has("prayer")) { this.applyFx({ vibes: 6 }); s.exposure = clamp(s.exposure - 3); } return "";
         case "party": {
           if (this.clock().hh >= 4 && this.clock().hh < 6) this.unlock("last_standing");
-          this.addMemory(`🪩 Partied at ${this.places.club.name} · ${this.day()} Dec`);
+          this.addMemory(`🪩 Partied at ${this.places[placeId].name} · ${this.day()} Dec`);
           return "";
         }
         case "drama": {
@@ -1050,6 +1071,97 @@
       }
       this.queue(ev);
       this.flush();
+    }
+
+    // ============================================================ Lekki Phase 1
+    addStress(n) {
+      const s = this.s;
+      if (!n) return;
+      s.stress = clamp((Number.isFinite(s.stress) ? s.stress : 15) + n);
+      if (s.stress >= 70) this.addMoodlet("stressed", 1);
+    }
+    stressLabel() { const v = this.s.stress || 0; return v >= 85 ? "Burning out" : v >= 70 ? "Stressed" : v >= 40 ? "Managing" : "Calm"; }
+    lekkiTick() {
+      const s = this.s, c = this.clock(), day = this.day();
+      if (s.stress >= 70) this.addMoodlet("stressed", 1);
+      if (s.over || s.event || s.queue.length || s.convo) return;
+      // Friends inviting you out — especially when you're broke.
+      if (c.mm === 0 && c.hh >= 18 && c.hh <= 22 && s.flags.invited !== day && s.place !== "lekkilounge" && this.rng() < (s.naira < 40000 ? 0.3 : 0.15)) {
+        const pool = W.NPCS.filter((n) => { const st = s.npcs[n.id]; return st.met && st.arrived && !n.vendor && !n.family && st.rel >= 25; });
+        if (pool.length) {
+          const f = pool[Math.floor(this.rng() * pool.length)];
+          const lounge = this.places.lekkilounge;
+          s.flags.invited = day;
+          this.message(f.id, `Omo, we're at ${lounge.name} right now! Pull up 🔥\nDon't be boring 😒\nWe got for you sha 🙅🏾`, { choices: [
+            { label: "🥳 Go out anyway", note: "+Social status · +Friendship · −Bank balance", plan: { kind: "fomo", place: "lekkilounge", start: s.t, end: s.t + 180, npc: f.id }, rel: 3, from: f.id, fx: { vibes: 4 } },
+            { label: "🏠 Stay home & hustle", note: "+Saves money · +Energy · FOMO debuff", fx: { energy: 8 }, special: "fomo", rel: -3, from: f.id },
+          ] });
+        }
+      }
+      // Shared-flat drama at home.
+      if (s.place === "home" && s.inside && (s.flags.homeDramaT || 0) < s.t - 1200 && this.rng() < 0.08) {
+        const sleeping = s.activity && s.activity.id === "sleep";
+        if (sleeping && (c.hh < 5 || c.hh >= 23)) {
+          if ((s.flags.noiseT || 0) > s.t - 2880) return;
+          s.flags.homeDramaT = s.t; s.flags.noiseT = s.t;
+          if (s.inventory.headphones > 0) { this.log("🎧 The neighbour is blasting music again. Noise-cancelling headphones: activated. You sleep like a baby.", "good"); return; }
+          this.applyFx({ energy: -6 }); this.addMoodlet("no_sleep_noise"); this.addStress(6);
+          this.queue({ title: "Neighbour Blasting Music at 3 AM", icon: "🔊", text: "Someone two flats down just discovered amapiano and a 2,000-watt speaker. The windows are vibrating. It's 3 AM.", choices: [
+            { label: "Confront them (high risk)", roll: { use: "street", base: 0.3, win: { text: "They turn it down and actually apologise. Respect.", stress: -6, rep: 2 }, lose: { text: "\"Is it your father's house?\" Now it's LOUDER.", stress: 18, fx: { energy: -10 } } } },
+            { label: "Buy noise-cancelling headphones", cost: 35000, give: "headphones", stress: -5, text: "Silence. Beautiful, expensive silence. They'll block the noise next time too." },
+            { label: "Report to the landlord", stress: 6, gossip: 1, text: "The landlord promises to \"look into it\". Somehow the whole building knows it was you. Drama ↑" },
+            { label: "Join the party 🎉", mins: 90, fx: { vibes: 14, energy: -14, social: 12 }, stress: -4, text: "If you can't beat them…" },
+          ] });
+          return;
+        }
+        if (sleeping || s.activity) return;
+        s.flags.homeDramaT = s.t;
+        const k = (s.flags.homeDramaIdx = ((s.flags.homeDramaIdx || 0) + 1) % 3);
+        if (k === 0) this.queue({ title: "Your Flatmate Ate Your Soup", icon: "🍲", text: "The pot of egusi you cooked on Sunday? Scraped clean. Your flatmate Tayo is suddenly 'asleep'.", choices: [
+          { label: "Confront them (high risk)", roll: { use: "street", base: 0.4, win: { text: "Tayo apologises and orders you a jollof pack.", fx: { belle: 25 }, stress: -6 }, lose: { text: "It becomes a shouting match. The whole building heard.", stress: 16, rep: -2, fx: { vibes: -8 }, moodlet: "flat_drama" } } },
+          { label: "Let it slide", stress: 7, fx: { vibes: -4 } },
+          { label: "Padlock your pot (₦5k)", cost: 5000, stress: -2, text: "Petty? Yes. Effective? Also yes." },
+        ] });
+        else if (k === 1) this.queue({ title: "Landlord Wants an Inspection Tomorrow", icon: "🏠", text: "Text from the landlord: \"Inspection tomorrow 10am. I hope I won't see any damage.\" The flat is… lived in.", choices: [
+          { label: "Deep clean tonight (2 hrs)", mins: 120, fx: { energy: -12, hygiene: -8 }, stress: 4, rep: 2, text: "Spotless. He found nothing to complain about. He complained anyway." },
+          { label: "Tip the caretaker to vouch for you (₦10k)", cost: 10000, stress: -2 },
+          { label: "Ignore it", forced: 20000, stress: 10, text: "He found the broken louvre. ₦20k 'damages'." },
+        ] });
+        else this.queue({ title: "Flatmate Won't Pay the Light Bill", icon: "💡", text: "Tayo: \"Abeg cover my share of the prepaid meter this month, I go pay you back.\" (They said that last month.)", choices: [
+          { label: "Cover it (₦12k)", cost: 12000, stress: -2, text: "Peace has a price. Today it's ₦12k." },
+          { label: "Argue it out", roll: { use: "conn", base: 0.35, win: { text: "They transfer the money with a sad face emoji.", stress: -4 }, lose: { text: "Now nobody is talking to anybody in this flat.", stress: 12, moodlet: "flat_drama" } } },
+          { label: "Switch off their socket 😈", stress: -4, rep: -1, text: "Their phone died at 4%. Justice." },
+        ] });
+      }
+    }
+    // A smile across the room: romance, networking… or trouble.
+    maybeChanceEncounter(placeId, chance, force) {
+      const s = this.s, c = this.clock();
+      const p = this.places[placeId];
+      if (!p || s.over || s.event || s.queue.length || s.convo) return;
+      if (!["lekkilounge", "lekkistreet", "club", "lounge", "beachclub"].includes(p.type)) return;
+      if (!force && !(c.hh >= 19 || c.hh < 4)) return;
+      if ((s.flags.encounterT || 0) > s.t - 360 || this.rng() > chance) return;
+      const pool = s.strangers.filter((x) => !x.met);
+      const st = (pool.length ? pool : s.strangers)[Math.floor(this.rng() * (pool.length || s.strangers.length))];
+      s.flags.encounterT = s.t;
+      const late = c.hh >= 1 && c.hh < 4;
+      const twist = this.rng() < (late ? 0.45 : 0.28) ? { id: st.id, name: st.name } : null;
+      this.queue({ title: "Someone Smiles at You…", icon: "😊", text: `${st.name} catches your eye from across ${p.kind === "open" ? "the close" : "the room"} and smiles.`, choices: [
+        { label: "Say hi, be confident", note: "+Romance / Networking", roll: { use: "clout", base: 0.45, win: { text: `${st.name} laughs at your joke and you swap numbers.`, conn: 3, relTo: { [st.id]: 22 }, romanceTo: { [st.id]: 12 }, fx: { vibes: 8 }, moodlet: "sweet_encounter", twist }, lose: { text: "A polite smile, then back to their friends. It happens.", stress: 4, relTo: { [st.id]: 4 }, twist } } },
+        { label: "Keep walking", note: "+Peace", stress: -3 },
+        { label: "Say something awkward", note: "−Reputation", rep: -3, fx: { vibes: -3 }, relTo: { [st.id]: 2 }, text: "\"So… do you come here often?\" Even the DJ heard it." },
+      ] });
+    }
+    encounterTwist(t) {
+      const s = this.s;
+      this.addMoodlet("near_fight");
+      this.addStress(8);
+      this.queue({ title: "Wrong Crowd", icon: "😬", text: `Turns out ${t.name} came with a very protective crew. One of them steps right into your face: "Wetin you dey find here?"`, choices: [
+        { label: "Pay a 'settlement' (₦15k)", cost: 15000, stress: 4, text: "Money changes hands. Everybody is suddenly your friend." },
+        { label: "Talk your way out", roll: { use: "street", base: 0.4, win: { text: "You crack a joke, they laugh, everybody hugs. Lekki things.", rep: 2, conn: 2, stress: -4 }, lose: { text: "A shove, a slap, a torn shirt. Security drags everyone apart.", rep: -4, stress: 15, fx: { hygiene: -15, vibes: -12 } } } },
+        { label: "Run for it 🏃🏾", roll: { use: "street", base: 0.55, win: { text: "You vanish into the crowd like a ninja.", fx: { energy: -12 }, stress: 3 }, lose: { text: "You trip over a speaker cable. Everybody saw.", fx: { energy: -12, vibes: -10 }, rep: -2, stress: 10 } } },
+      ] });
     }
 
     // ============================================================ the Luxury Zone
@@ -1537,6 +1649,10 @@
       if (o.buyStyle) { this.addStyle(o.buyStyle); this.log(`🛍️ ${D.STYLES[o.buyStyle].name} added to your wardrobe. Change at home or right here.`, "good"); }
       if (o.buyItem) { s.inventory[o.buyItem] = (s.inventory[o.buyItem] || 0) + 1; const it = W.ITEMS[o.buyItem]; if (["shoes", "bag", "jewelry"].includes(it.kind)) this.equipItem(o.buyItem); this.log(`${it.icon} Bought: ${it.name}.`, "good"); }
       if (o.buyLimited) this.gotLimited(o.buyLimited);
+      if (o.stress) this.addStress(o.stress);
+      if (o.romanceTo) for (const id in o.romanceTo) { const st = this.whoState(id); if (st) { st.met = true; st.romance = clamp((st.romance || 0) + o.romanceTo[id]); } }
+      if (o.moodlet) this.addMoodlet(o.moodlet);
+      if (o.twist) this.encounterTwist(o.twist);
       if (o.setHair) { s.look = { ...s.look, hair: o.setHair }; this.log(`💇🏾 New hair: ${D.HAIR[s.look.body][o.setHair]}.`, "good"); }
       if (o.sellUsd) { const got = o.sellUsd * o.rate; s.usd -= o.sellUsd; s.naira += got; this.log(`💱 Sold $${o.sellUsd} for ${naira(got)}.`, "good"); }
       if (o.japaCount) s.stats.japaHelped++;
@@ -1572,6 +1688,7 @@
     resolveSpecial(c, ev) {
       const s = this.s;
       if (!c.special) return "";
+      if (c.special === "fomo") { this.addMoodlet("fomo"); this.addStress(4); this.earn(6000, "gig"); return " You did some online gigs instead (+₦6,000). Your WhatsApp status views say they're having the time of their lives."; }
       if (c.special === "forcesleep") { s.place = "home"; s.inside = true; s.activity = { id: "sleep", place: "home", start: s.t, end: s.t + 360, label: "Sleep", icon: "😴" }; return ""; }
       if (c.special === "own") { s.exposed = true; this.news("exposed"); this.unlock("caught"); return ""; }
       if (c.special === "village") { s.flags.village = true; this.skipTo(26 * DAY - DAY + W.hm("09:00")); return ""; }
@@ -2265,6 +2382,14 @@
           if (p.kind === "date") { const st = s.npcs[p.npc]; st.romance = clamp(st.romance + 10); s.stats.dates++; this.applyFx({ vibes: 18 }); this.log(`💞 Date with ${this.who(p.npc).name}. The city lights, the conversation… 🥹`, "good"); this.addMemory(`💞 Date with ${this.who(p.npc).name} · ${this.day()} Dec`); }
           else if (p.kind === "brand") { this.earn(p.pay, "brand"); this.post(p.place); this.log(`💌 Brand deal done: ${naira(p.pay)}.`, "good"); }
           else if (p.kind === "chain") { /* chain step fires via chainCheck */ }
+          else if (p.kind === "fomo") {
+            const share = round100(12000 + this.rng() * 14000);
+            if (this.canAfford(share)) this.pay(share); else this.payForced(share);
+            this.addStat("clout", 3); this.applyFx({ vibes: 14, social: 22 }); this.addMoodlet("showed_up");
+            s.stats.fomoShows = (s.stats.fomoShows || 0) + 1;
+            if (s.stats.fomoShows >= 2) this.unlock("lekki_legend");
+            this.log(`🫶🏾 You pulled up for ${this.who(p.npc).name}. Your share of the bill: ${naira(share)}. Worth it? The pictures say yes.`, "good");
+          }
           else { this.applyFx({ vibes: 10 }); this.log(`🤝 You showed up for ${this.who(p.npc).name}. They noticed.`, "good"); }
         } else if (s.t > p.end) {
           p.status = "missed";

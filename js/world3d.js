@@ -170,8 +170,8 @@
       const dashes = [];
       const crosses = (z1, z2) => lagos && Math.min(z1, z2) < G.water.band[0] && Math.max(z1, z2) > G.water.band[1];
       for (const z of G.hRoads) {
-        this.add(box(136, 0.1, G.roadW, asphalt), 0, 0.05, z);
-        for (let x = -66; x < 66; x += 4) if (!G.vRoads.some((v) => Math.abs(v - x) < 3.5)) dashes.push([x, z, 0]);
+        this.add(box(G.bounds.x[1] - G.bounds.x[0], 0.1, G.roadW, asphalt), (G.bounds.x[0] + G.bounds.x[1]) / 2, 0.05, z);
+        for (let x = G.bounds.x[0] + 2; x < G.bounds.x[1] - 2; x += 4) if (!G.vRoads.some((v) => Math.abs(v - x) < 3.5)) dashes.push([x, z, 0]);
       }
       for (const x of G.vRoads) for (let j = 0; j < G.hRoads.length - 1; j++) {
         const z1 = G.hRoads[j], z2 = G.hRoads[j + 1];
@@ -193,22 +193,22 @@
       // Water: lagoon (Lagos) or park (Abuja); ocean or lake to the south.
       const [b0, b1] = G.water.band;
       if (lagos) {
-        this.water = this.add(new THREE.Mesh(new THREE.PlaneGeometry(150, b1 - b0), lam(0x4fa9d6)), 0, 0.02, (b0 + b1) / 2);
+        this.water = this.add(new THREE.Mesh(new THREE.PlaneGeometry(175, b1 - b0), lam(0x4fa9d6)), 12.5, 0.02, (b0 + b1) / 2);
         this.water.rotation.x = -Math.PI / 2;
-        const xs = [-75, ...G.water.bridges.flatMap((b) => [b - 3.2, b + 3.2]), 75];
+        const xs = [-75, ...G.water.bridges.flatMap((b) => [b - 3.2, b + 3.2]), 100];
         for (let i = 0; i < xs.length; i += 2) this.collider((xs[i] + xs[i + 1]) / 2, (b0 + b1) / 2, xs[i + 1] - xs[i], b1 - b0);
       } else {
-        this.add(new THREE.Mesh(new THREE.PlaneGeometry(150, b1 - b0), lam(0xa9d68e)), 0, 0.03, (b0 + b1) / 2).rotation.x = -Math.PI / 2;
-        this.addTrees([...Array(26)].map((_, i) => [-62 + i * 5, b0 + 2 + (i % 2) * 7]));
+        this.add(new THREE.Mesh(new THREE.PlaneGeometry(175, b1 - b0), lam(0xa9d68e)), 12.5, 0.03, (b0 + b1) / 2).rotation.x = -Math.PI / 2;
+        this.addTrees([...Array(31)].map((_, i) => [-62 + i * 5, b0 + 2 + (i % 2) * 7]).filter(([x]) => !G.vRoads.some((v) => Math.abs(v - x) < 4)));
         const path = lam(0xe9dcc0);
-        this.add(box(140, 0.06, 1.6, path), 0, 0.05, (b0 + b1) / 2);
+        this.add(box(165, 0.06, 1.6, path), 12.5, 0.05, (b0 + b1) / 2);
       }
       const [s0, s1] = G.beach;
-      this.add(new THREE.Mesh(new THREE.PlaneGeometry(150, s1 - s0 + 2), lam(lagos ? 0xf1dda2 : 0xc9e2a6)), 0, 0.03, (s0 + s1) / 2).rotation.x = -Math.PI / 2;
+      this.add(new THREE.Mesh(new THREE.PlaneGeometry(175, s1 - s0 + 2), lam(lagos ? 0xf1dda2 : 0xc9e2a6)), 12.5, 0.03, (s0 + s1) / 2).rotation.x = -Math.PI / 2;
       this.sea = this.add(new THREE.Mesh(new THREE.PlaneGeometry(220, 60), lam(lagos ? 0x3d97cf : 0x5cb2d6)), 0, 0.01, s1 + 30);
       this.sea.rotation.x = -Math.PI / 2;
       this.collider(0, s1 + 30, 240, 60);
-      this.foam = this.add(box(150, 0.03, 0.5, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7 })), 0, 0.05, s1 + 0.4);
+      this.foam = this.add(box(175, 0.03, 0.5, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7 })), 12.5, 0.05, s1 + 0.4);
       if (lagos) {
         // Eko Atlantic: glass towers on reclaimed land, off to the south-east so
         // they never sit between the camera and the beach.
@@ -249,9 +249,14 @@
         }
       }
 
+      // Blocks with no venue get a row of homes.
+      for (const x of G.cols) for (const z of G.rows) {
+        if (Object.values(this.places).some((p) => !p.remote && Math.abs(p.x - x) < 10 && Math.abs(p.z - z) < 7)) continue;
+        this.buildHomes(x, z);
+      }
       // Street lamps along the roads.
       const lampPos = [];
-      for (const z of G.hRoads) for (let x = -60; x <= 60; x += 13) lampPos.push([x, z + 3.6]);
+      for (const z of G.hRoads) for (let x = -60; x <= 88; x += 13) lampPos.push([x, z + 3.6]);
       const poleMesh = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.08, 0.1, 4.2, 6), lam(0x3c4048), lampPos.length);
       const bulbMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(0.28, 8, 6), this.bulbMat, lampPos.length);
       lampPos.forEach(([x, z], i) => { m4.makeTranslation(x, 2.1, z); poleMesh.setMatrixAt(i, m4); m4.makeTranslation(x, 4.25, z); bulbMesh.setMatrixAt(i, m4); });
@@ -261,7 +266,7 @@
       const trees = [];
       for (const x of G.cols) for (const z of G.rows) { trees.push([x - 9.6, z - 6.6], [x + 9.6, z - 6.6]); }
       const inClub = (x, z) => ["beachclub", "shortlet", "conceptstore"].some((k) => { const bc = this.places[k]; return bc && Math.abs(x - bc.x) < bc.w / 2 + 2 && Math.abs(z - bc.z) < bc.d / 2 + 2; });
-      for (let x = -64; x <= 64; x += 9) if (!inClub(x, lagos ? 59 : 60)) trees.push([x, lagos ? 59 : 60]);
+      for (let x = -64; x <= 90; x += 9) if (!inClub(x, lagos ? 59 : 60)) trees.push([x, lagos ? 59 : 60]);
       this.addTrees(trees);
       this.buildDecorations();
     }
@@ -403,11 +408,86 @@
       [[-w / 2 - 0.5, front - 0.4], [w / 2 + 0.5, back]].forEach(([dx, z]) => this.palm(x0 + dx, z));
     }
 
+    // A row of family homes with walls and gates (empty blocks).
+    buildHomes(cx, cz) {
+      const cols = [0xf3e3c3, 0xe9d2b4, 0xf6efe4, 0xd9e4ec, 0xf2d7d0];
+      for (let i = 0; i < 3; i++) {
+        const x = cx - 6.4 + i * 6.4, h = 4.5 + ((i * 7 + cx) % 3) * 1.6;
+        this.add(box(5.2, h, 7, lam(cols[(i + Math.abs(cx)) % 5])), x, h / 2 + 0.12, cz - 1);
+        this.add(box(5.6, 0.3, 7.4, lam(0x8a5a44)), x, h + 0.25, cz - 1);
+        [-1.3, 1.3].forEach((dx) => this.add(box(1.1, 1.1, 0.1, this.windowMat), x + dx, h - 1.4, cz + 2.55));
+        this.add(box(1, 1.9, 0.1, lam(0x5b3a23)), x, 1.07, cz + 2.55);
+        this.add(box(5.6, 1.4, 0.2, lam(0xe8e2d4)), x, 0.82, cz + 5.4);
+        this.add(box(1.6, 1.3, 0.22, lam(0x2f3238)), x, 0.8, cz + 5.42);
+        this.collider(x, cz + 1.2, 5.8, 9);
+      }
+    }
+
+    // Neon Palm, Lekki: the restaurant-lounge-club everyone ends up at.
+    buildNeonLounge(p) {
+      const x0 = p.x, z0 = p.z, w = p.w - 1, d = p.d - 1, h = p.h, front = z0 + d / 2;
+      const body = lam(0x2a1f3d), black = lam(0x141018);
+      const pink = new THREE.MeshBasicMaterial({ color: 0xff3dbb }), blue = new THREE.MeshBasicMaterial({ color: 0x4fc3ff });
+      this.neonMats.push(pink);
+      this.add(box(w, h, d - 3, body), x0, h / 2 + 0.12, z0 - 1.5);
+      this.add(box(w + 0.4, 0.4, d - 2.6, black), x0, h + 0.3, z0 - 1.5);
+      this.collider(x0, z0 - 1.5, w, d - 3);
+      const fz = front - 3;
+      this.add(box(w - 2, 3.0, 0.15, this.windowMat), x0, 1.8, fz + 0.05);
+      this.add(box(w - 2, 1.6, 0.15, this.windowMat), x0, 5.0, fz + 0.05);
+      this.add(box(w + 0.1, 0.12, 0.12, pink), x0, h + 0.05, fz + 0.1);
+      this.add(box(w - 2, 0.1, 0.1, pink), x0, 3.45, fz + 0.15);
+      [-w / 2 + 0.3, w / 2 - 0.3].forEach((dx) => this.add(box(0.12, h, 0.12, blue), x0 + dx, h / 2 + 0.12, fz + 0.1));
+      const s = this.add(new THREE.Mesh(new THREE.PlaneGeometry(7.5, 1.9), new THREE.MeshBasicMaterial({ map: signTexture(p.icon, p.name), transparent: true })), x0, h - 0.6, fz + 0.2);
+      void s;
+      // Front terrace: tables under umbrellas, palms in pink-lit planters, string bulbs.
+      this.add(box(w, 0.15, 3, lam(0x3a2c4f)), x0, 0.14, front - 1.4);
+      [-5.5, -2, 2, 5.5].forEach((dx, i) => {
+        this.add(new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.08, 12), lam(0xf4f4f4)), x0 + dx, 1.0, front - 1.4);
+        this.add(new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1, 6), black), x0 + dx, 0.5, front - 1.4);
+        this.add(new THREE.Mesh(new THREE.ConeGeometry(1.3, 0.5, 10), lam(i % 2 ? 0xff3dbb : 0x1c1c1e)), x0 + dx, 2.5, front - 1.4);
+        this.add(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.5, 4), black), x0 + dx, 1.75, front - 1.4);
+      });
+      this.collider(x0, front - 1.4, w - 2, 1.4);
+      [-w / 2 - 0.2, w / 2 + 0.2].forEach((dx) => { this.add(box(1, 0.8, 1, pink), x0 + dx, 0.5, front - 0.6); this.palm(x0 + dx, front - 0.6); });
+      for (let i = 0; i <= 16; i++) this.add(new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 4), this.bulbMat), x0 - w / 2 + i * (w / 16), 3.2 - Math.sin((i / 16) * Math.PI) * 0.5, front - 0.1);
+    }
+
+    // Admiralty Close: Lekki homes, one of them always throwing a party.
+    buildLekkiStreet(p) {
+      const x0 = p.x, z0 = p.z;
+      const homes = [[-6.5, 0xf6efe4, false], [0, 0xffffff, true], [6.5, 0xe9d2b4, false]];
+      homes.forEach(([dx, c, party]) => {
+        const x = x0 + dx, h = party ? 7.4 : 6;
+        this.add(box(5.6, h, 7, lam(c)), x, h / 2 + 0.12, z0 - 2.5);
+        this.add(box(6, 0.3, 7.4, lam(party ? 0x1c1c1e : 0x7a4b3a)), x, h + 0.25, z0 - 2.5);
+        [-1.4, 1.4].forEach((wx) => { this.add(box(1.2, 1.4, 0.1, this.windowMat), x + wx, 1.6, z0 + 1.05); this.add(box(1.2, 1.4, 0.1, this.windowMat), x + wx, h - 1.6, z0 + 1.05); });
+        this.add(box(6, 1.5, 0.2, lam(0xe8e2d4)), x, 0.87, z0 + 3.8);
+        this.add(box(1.8, 1.4, 0.22, lam(0x2f3238)), x, 0.82, z0 + 3.82);
+        this.collider(x, z0 - 0.6, 6.2, 9.2);
+        if (party) {
+          const cA = new THREE.MeshBasicMaterial({ color: 0xff3dbb }), cB = new THREE.MeshBasicMaterial({ color: 0x4fc3ff });
+          this.neonMats.push(cA, cB);
+          this.add(box(5.7, 0.1, 0.1, cA), x, h - 0.1, z0 + 1.1);
+          this.add(box(5.7, 0.1, 0.1, cB), x, 3.2, z0 + 1.1);
+          [-2.2, 2.2].forEach((sx) => { this.add(box(0.7, 1.4, 0.6, lam(0x111111)), x + sx, 0.85, z0 + 2.2); });
+          for (let i = 0; i < 9; i++) this.add(new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 4), i % 2 ? cA : cB), x - 2.8 + i * 0.7, 2.2 - Math.sin(i / 8 * Math.PI) * 0.3, z0 + 3.9);
+          this.add(new THREE.Mesh(new THREE.PlaneGeometry(5, 1.25), new THREE.MeshBasicMaterial({ map: signTexture("🎉", "House Party Tonight"), transparent: true })), x, h + 1.3, z0 + 1.1);
+        }
+      });
+      // Cars squeezed onto the close, palms and a gateman's post.
+      [[-4, 0xc62828], [4.6, 0x1565c0]].forEach(([dx, c]) => { this.add(box(1.8, 0.8, 3.6, lam(c)), x0 + dx, 0.6, z0 + 5.6); this.add(box(1.6, 0.6, 1.8, lam(0x263238)), x0 + dx, 1.2, z0 + 5.4); this.collider(x0 + dx, z0 + 5.6, 1.9, 3.6); });
+      this.palm(x0 - 9.6, z0 + 4.5); this.palm(x0 + 9.6, z0 + 4.5);
+      this.add(box(1.4, 2.2, 1.4, lam(0xf0e6c8)), x0 + 9.2, 1.2, z0 + 1.5);
+    }
+
     buildPlace(p) {
       const T = W.TYPES[p.type];
       if (p.type === "beachclub") { this.buildBeachClub(p); return; }
       if (p.type === "shortlet") { this.buildMansion(p); return; }
       if (p.type === "conceptstore") { this.buildBoutique(p); return; }
+      if (p.type === "lekkilounge") { this.buildNeonLounge(p); return; }
+      if (p.type === "lekkistreet") { this.buildLekkiStreet(p); return; }
       const front = p.z + (p.side === "S" ? 1 : -1) * (p.d / 2);
       const dir = p.side === "S" ? 1 : -1;
       const sign = (y, w = Math.min(p.w - 1, 9)) => {
@@ -594,11 +674,12 @@
     buildVehicles() {
       this.cars = [];
       const loops = [
-        [[-65, -30], [65, -30], [65, -50], [-65, -50]],
+        [[-65, -30], [91, -30], [91, -50], [-65, -50]],
         [[-65, -10], [65, -10], [65, -30], [-65, -30]],
         [[-39, -10], [-39, 8], [13, 8], [13, -10]],
-        [[-65, 28], [65, 28], [65, 48], [-65, 48]],
+        [[-65, 28], [91, 28], [91, 48], [-65, 48]],
         [[-65, 8], [65, 8], [65, 28], [-65, 28]],
+        [[65, 8], [91, 8], [91, 48], [65, 48]],
       ];
       const cols = [0xffc400, 0xffffff, 0x1565c0, 0xc62828, 0x212121, 0xffc400, 0x9e9e9e];
       loops.forEach((loop, i) => {

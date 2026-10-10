@@ -885,3 +885,15 @@ kbd { display: inline-block; min-width: 24px; padding: 2px 7px; margin: 0 2px 2p
 .mg-cursor { position: absolute; top: -5px; bottom: -5px; width: 6px; margin-left: -3px; border-radius: 3px; background: #fff; box-shadow: 0 0 8px #fff; }
 .mg-shots { margin: 0; font-weight: 700; font-size: .85rem; }
 .mg-snap { width: 100%; max-width: 340px; }
+
+.minimap .mm-lekki { fill: rgba(255, 61, 187, .07); stroke: #ff3dbb; stroke-width: 3; stroke-dasharray: 10 8; pointer-events: none; }
+.minimap .mm-zone.lekki { fill: #b0127e; text-anchor: middle; font-size: 13px; }
+.minimap .mm-zone.lekki.sub { font-size: 10px; letter-spacing: .3em; }
+
+.mini-stats .hot { color: var(--coral); font-weight: 800; }
+.stress-box { margin: 12px 0 0; padding: 12px; border-radius: 16px; background: var(--chip); }
+.stress-box .meter-top { display: flex; justify-content: space-between; font-size: .85rem; margin-bottom: 6px; }
+.stress-box .muted-sm { display: block; margin-top: 6px; }
+.bar.stress i { background: var(--mint); }
+.bar.stress.mid i { background: var(--gold); }
+.bar.stress.lo i { background: var(--coral); }

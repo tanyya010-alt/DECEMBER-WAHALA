@@ -78,12 +78,13 @@
     const places = W.buildPlaces(city);
     const X = (x) => (x + 72) * 5, Z = (z) => (z + 58) * 5;
     const lagos = city === "lagos";
-    let svg = `<svg class="minimap" viewBox="0 0 720 640" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Map of ${city}">`;
-    svg += `<rect width="720" height="640" fill="${lagos ? "#d6e4b5" : "#cfe3b0"}"/>`;
-    svg += `<rect x="0" y="${Z(G.beach[0])}" width="720" height="${(G.beach[1] - G.beach[0]) * 5}" fill="${lagos ? "#f1dda2" : "#c9e2a6"}"/>`;
-    svg += `<rect x="0" y="${Z(G.beach[1])}" width="720" height="200" fill="${lagos ? "#3d97cf" : "#5cb2d6"}"/>`;
-    svg += `<rect x="0" y="${Z(G.water.band[0])}" width="720" height="${(G.water.band[1] - G.water.band[0]) * 5}" fill="${lagos ? "#4fa9d6" : "#a9d68e"}"/>`;
-    for (const z of G.hRoads) svg += `<rect x="${X(-68)}" y="${Z(z) - 15}" width="${136 * 5}" height="30" fill="#5a606a"/>`;
+    const MW = (G.bounds.x[1] + 74) * 5;
+    let svg = `<svg class="minimap" viewBox="0 0 ${MW} 640" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Map of ${city}">`;
+    svg += `<rect width="${MW}" height="640" fill="${lagos ? "#d6e4b5" : "#cfe3b0"}"/>`;
+    svg += `<rect x="0" y="${Z(G.beach[0])}" width="${MW}" height="${(G.beach[1] - G.beach[0]) * 5}" fill="${lagos ? "#f1dda2" : "#c9e2a6"}"/>`;
+    svg += `<rect x="0" y="${Z(G.beach[1])}" width="${MW}" height="200" fill="${lagos ? "#3d97cf" : "#5cb2d6"}"/>`;
+    svg += `<rect x="0" y="${Z(G.water.band[0])}" width="${MW}" height="${(G.water.band[1] - G.water.band[0]) * 5}" fill="${lagos ? "#4fa9d6" : "#a9d68e"}"/>`;
+    for (const z of G.hRoads) svg += `<rect x="${X(G.bounds.x[0])}" y="${Z(z) - 15}" width="${(G.bounds.x[1] - G.bounds.x[0]) * 5}" height="30" fill="#5a606a"/>`;
     for (const x of G.vRoads) for (let j = 0; j < G.hRoads.length - 1; j++) {
       const z1 = G.hRoads[j], z2 = G.hRoads[j + 1];
       if (lagos && z1 < G.water.band[0] && z2 > G.water.band[1] && !G.water.bridges.includes(x)) continue;
@@ -93,7 +94,9 @@
     svg += `<text x="${X(30)}" y="${Z(-0.6)}" class="mm-water">${lagos ? "LAGOS LAGOON" : "RING ROAD PARK"}</text>`;
     svg += `<text x="360" y="${Z(G.beach[1]) + 40}" class="mm-water">${lagos ? "ATLANTIC OCEAN" : "JABI LAKE"}</text>`;
     // The Luxury Zone: everything south of the lagoon.
-    svg += `<rect x="${X(-67.5)}" y="${Z(9.5)}" width="${135 * 5}" height="${(G.beach[1] - 9.5) * 5}" rx="18" class="mm-lux"/>`;
+    svg += `<rect x="${X(-67.5)}" y="${Z(9.5)}" width="${133 * 5}" height="${(G.beach[1] - 9.5) * 5}" rx="18" class="mm-lux"/>`;
+    svg += `<rect x="${X(66.5)}" y="${Z(9.5)}" width="${27 * 5}" height="${(G.beach[1] - 9.5) * 5}" rx="18" class="mm-lekki"/>`;
+    svg += `<text x="${X(80)}" y="${Z(G.beach[0]) + 26}" class="mm-zone lekki">🌴 ${lagos ? "LEKKI PHASE 1" : "GWARINPA"}</text><text x="${X(80)}" y="${Z(G.beach[0]) + 44}" class="mm-zone lekki sub">SOCIAL HUB</text>`;
     svg += `<text x="${X(-66)}" y="${Z(11.4)}" class="mm-zone">👑 ${lagos ? "VICTORIA ISLAND & EKO ATLANTIC" : "MAITAMA & WUSE II"} · LUXURY ZONE</text>`;
     svg += `<text x="${X(-66)}" y="${Z(-3.2)}" class="mm-zone main">🛠️ MAINLAND · HUSTLE ZONE</text>`;
     svg += `<text x="${X(0)}" y="${Z(28) + 5}" class="mm-strip">✦ THE STRIP ✦</text>`;
@@ -661,6 +664,7 @@
     if (o.usd) bits.push(`−$${o.usd}`);
     if (o.fx) bits.push(Object.entries(o.fx).map(([k, v]) => `${(NEEDS[k] || D.NEEDS[k]).icon}${v > 0 ? "+" : ""}${v}`).join(" "));
     [["clout", "📱"], ["rep", "🤝🏾"], ["conn", "🔗"], ["followers", "👥"]].forEach(([k, i]) => { if (o[k]) bits.push(`${i}${o[k] > 0 ? "+" : ""}${o[k]}`); });
+    if (o.stress) bits.push(`😤${o.stress > 0 ? "+" : ""}${o.stress}`);
     if (o.mins) bits.push(`⏱ ${S.fmtMins(o.mins)}`);
     if (o.note) bits.push(o.note);
     return bits.join(" · ");
@@ -697,7 +701,7 @@
     const nh = Object.keys(NEEDS).map((k) => needBar(k, s.needs[k])).join("");
     if ($("h-needs").dataset.html !== nh) { $("h-needs").innerHTML = nh; $("h-needs").dataset.html = nh; }
     const mls = sim.moodlets().sort((a, b) => b.w - a.w).slice(0, 7);
-    const mh = mls.map((m) => `<span class="ml" style="--c:${SIMS.EMOTIONS[m.emotion].color}" title="${esc(m.label)} · ${esc(SIMS.EMOTIONS[m.emotion].name)} +${m.w}${m.until ? ` · ${S.fmtMins(Math.max(1, Math.round(m.until - s.t)))} left` : ""}">${m.icon}</span>`).join("") + `<span class="mini-stats"><span title="Clout">📱 ${Math.round(s.clout)}</span><span title="Reputation">🤝🏾 ${Math.round(s.rep)}</span><span title="Connections">🔗 ${Math.round(s.conn)}</span><span title="Followers">👥 ${compact(s.followers)}</span></span>`;
+    const mh = mls.map((m) => `<span class="ml" style="--c:${SIMS.EMOTIONS[m.emotion].color}" title="${esc(m.label)} · ${esc(SIMS.EMOTIONS[m.emotion].name)} +${m.w}${m.until ? ` · ${S.fmtMins(Math.max(1, Math.round(m.until - s.t)))} left` : ""}">${m.icon}</span>`).join("") + `<span class="mini-stats"><span title="Clout">📱 ${Math.round(s.clout)}</span><span title="Reputation">🤝🏾 ${Math.round(s.rep)}</span><span title="Connections">🔗 ${Math.round(s.conn)}</span><span title="Followers">👥 ${compact(s.followers)}</span><span title="Stress: ${sim.stressLabel()}" class="${s.stress >= 70 ? "hot" : ""}">😤 ${Math.round(s.stress || 0)}</span></span>`;
     if ($("h-moodlets").dataset.html !== mh) { $("h-moodlets").innerHTML = mh; $("h-moodlets").dataset.html = mh; }
     const pl = s.place && sim.places[s.place];
     $("h-here").disabled = !(pl && (s.inside || pl.kind === "open") && !s.ride);
@@ -923,6 +927,8 @@
     const why = sim.abilityBlocked();
     html += `<div class="ability"><b>${P.ability.icon} ${P.ability.name}</b><p>${esc(P.good)}</p><p class="muted-sm">${esc(P.bad)}</p><button class="btn primary" data-ability ${why ? "disabled" : ""}>${why ? esc(why) : "Use it"}</button></div>`;
     html += `<div class="stats4">${[["📱", "Clout", s.clout], ["🤝🏾", "Reputation", s.rep], ["🔗", "Connections", s.conn], ["👥", "Followers", compact(s.followers)]].map(([i, l, v]) => `<div class="stat"><small>${i} ${l}</small><b>${typeof v === "number" ? Math.round(v) : v}</b></div>`).join("")}</div>`;
+    const sv = Math.round(s.stress || 0);
+    html += `<div class="stress-box"><div class="meter-top"><span>😤 Stress · <b>${sim.stressLabel()}</b></span><span>${sv} / 100</span></div><div class="bar stress ${sv >= 70 ? "lo" : sv >= 40 ? "mid" : ""}"><i style="width:${Math.max(3, sv)}%"></i></div><small class="muted-sm">Keep it low: at 70+ gigs pay less and skills grow slower; at 85+ you can't sleep properly. Sleep, chill spots and good vibes bring it down. Flat drama, debt and fights push it up.</small></div>`;
     html += luxuryCard();
     const rk = sim.s.persona === "ijgb" ? `$${Math.round(s.usd)}` : sim.s.persona === "aunty" ? `${s.gossip} pieces` : `${Math.round(s.res)} / 100`;
     html += `<div class="meter"><div class="meter-top"><span>${P.resource.icon} ${P.resource.label}</span><span>${rk}</span></div></div>`;

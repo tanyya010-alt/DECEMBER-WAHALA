@@ -8,15 +8,15 @@
   // ------------------------------------------------------------ street grid
   // x runs east, z runs south. Blocks sit between roads; doors face a road.
   const GRID = {
-    cols: [-52, -26, 0, 26, 52],
+    cols: [-52, -26, 0, 26, 52, 78], // the last column is Lekki Phase 1 (island side)
     rows: [-40, -20, 18, 38],
     blockW: 20, blockD: 14,
-    vRoads: [-65, -39, -13, 13, 39, 65],
+    vRoads: [-65, -39, -13, 13, 39, 65, 91],
     hRoads: [-50, -30, -10, 8, 28, 48],
     roadW: 6,
-    water: { band: [-7, 5], bridges: [-39, 13] }, // lagoon between rows 1 and 2
+    water: { band: [-7, 5], bridges: [-39, 13, 91] }, // 91: the Lekki–Ikoyi link bridge // lagoon between rows 1 and 2
     beach: [51, 62],
-    bounds: { x: [-68, 68], z: [-53, 63] },
+    bounds: { x: [-68, 94], z: [-53, 63] },
   };
 
   // ------------------------------------------------------------ place types
@@ -50,6 +50,9 @@
     photo: { icon: "📸", kind: "open", hours: null, actions: ["photoshoot", "collab"] },
     airport: { icon: "✈️", kind: "remote", hours: null, actions: ["pickup", "watch_arrivals"] },
     shortlet: { icon: "🔑", kind: "building", h: 8, color: "#f4f4f2", roof: "#8a6b4a", hours: null, actions: ["book_penthouse", "chef_dinner", "wine_tasting", "movie_night", "content_shoot", "penthouse_party"] },
+    // Lekki Phase 1: the social middle ground.
+    lekkilounge: { icon: "🌴", kind: "building", h: 7, color: "#2a1f3d", roof: "#ff3dbb", neon: "#ff3dbb", hours: [hm("12:00"), hm("28:00")], actions: ["lekki_hangout", "lekki_lounge_chat", "lekki_club_night", "drinks"] },
+    lekkistreet: { icon: "🏘️", kind: "open", hours: null, actions: ["house_party", "street_hang", "neighbour_gist"] },
     conceptstore: { icon: "💎", kind: "building", h: 6, color: "#f3ede4", roof: "#1c1c1e", hours: [hm("11:00"), hm("21:00")], actions: ["browse_drop", "buy_wristband", "styling_session", "store_network"] },
     beachclub: { icon: "🏝️", kind: "building", h: 4, color: "#fbf7ef", roof: "#d8a93b", hours: [hm("10:00"), hm("27:00")], actions: ["pool_swim", "daybed_lounge", "beach_brunch", "sundowner", "vip_cabana", "beachclub_party", "dj_set"] },
   };
@@ -64,6 +67,7 @@
     ["fashion", 3, 2, "S", -5, 9], ["cafe", 3, 2, "S", 5, 9], ["restaurant", 4, 2, "S", 0, 16],
     ["fastfood", 0, 3, "S", 0, 14], ["suya", 1, 3, "S", 0, 14], ["club", 2, 3, "S", 0, 18],
     ["concert", 3, 3, "S", 0, 20], ["lounge", 4, 3, "S", 0, 14],
+    ["lekkilounge", 5, 2, "S", 0, 18], ["lekkistreet", 5, 3, "S", 0, 18],
   ];
 
   const NAMES = {
@@ -74,7 +78,7 @@
       bdc: "Mallam Musa BDC", mall: "Palms Mall", fashion: "Àṣà Fashion House", cafe: "Bean & Breeze Café",
       restaurant: "Island Grill", fastfood: "Chop Republic", suya: "Mallam Suya Spot", club: "Club Eko",
       concert: "Eko Atlantic Festival Grounds", lounge: "Sky Rooftop Lounge", beach: "Oniru Beach",
-      photo: "The Detty Wall", airport: "Murtala Muhammed Airport", beachclub: "Eko Shores Beach Club", shortlet: "Ocean Crest Penthouse", conceptstore: "The Eko Concept Store",
+      photo: "The Detty Wall", airport: "Murtala Muhammed Airport", beachclub: "Eko Shores Beach Club", shortlet: "Ocean Crest Penthouse", conceptstore: "The Eko Concept Store", lekkilounge: "Neon Palm Lekki", lekkistreet: "Admiralty Close",
     },
     abuja: {
       family: "Family House", home: "Your Flat", mamaput: "Mama Cass Kitchen", salon: "Wuse Cuts & Curls", gym: "Capital Fitness",
@@ -83,7 +87,7 @@
       bdc: "Zone 4 BDC", mall: "Jabi Lake Mall", fashion: "Àṣà Fashion House", cafe: "Bean & Breeze Café",
       restaurant: "Wuse 2 Grill", fastfood: "Chop Republic", suya: "Area 11 Suya", club: "Club Maitama",
       concert: "Eagle Square Concert Grounds", lounge: "Sky Lounge Maitama", beach: "Jabi Lakeside",
-      photo: "Millennium Park Arch", airport: "Nnamdi Azikiwe Airport", beachclub: "Jabi Shores Lakeside Club", shortlet: "Maitama Hills Penthouse", conceptstore: "Maitama Concept Store",
+      photo: "Millennium Park Arch", airport: "Nnamdi Azikiwe Airport", beachclub: "Jabi Shores Lakeside Club", shortlet: "Maitama Hills Penthouse", conceptstore: "Maitama Concept Store", lekkilounge: "Neon Palm Wuse", lekkistreet: "Gwarinpa Close",
     },
   };
 
@@ -215,6 +219,13 @@
     movie_night: { name: "Movie night on the big screen", icon: "🎬", mins: 120, fx: { vibes: 20, energy: 6 } },
     content_shoot: { name: "Shoot content for the 'gram", icon: "🤳🏾", mins: 40, special: "post", clout: 3 },
     penthouse_party: { name: "Throw a penthouse party", icon: "🥂", mins: 240, cost: 180000, fx: { vibes: 40, energy: -20, social: 30 }, clout: 12, conn: 8, big: true, needsBooking: true, special: "host" },
+    // Lekki Phase 1 social hub.
+    lekki_hangout: { name: "Eat, drink and catch up", icon: "🍤", mins: 75, cost: 18000, fx: { belle: 45, vibes: 14, social: 18 }, food: true, clout: 2 },
+    lekki_lounge_chat: { name: "Lounge chats (network)", icon: "🛋️", mins: 45, cost: 8000, fx: { social: 12, vibes: 6 }, conn: 6, clout: 1, special: "meet" },
+    lekki_club_night: { name: "Club night on the dance floor", icon: "💃🏾", mins: 150, cost: 12000, fx: { vibes: 32, energy: -18, social: 15 }, clout: 5, big: true, window: [22, 4], special: "party" },
+    house_party: { name: "Crash a house party", icon: "🏠", mins: 150, fx: { vibes: 28, energy: -16, social: 22 }, clout: 3, conn: 3, big: true, window: [21, 4], special: "houseparty" },
+    street_hang: { name: "Hang out on the close", icon: "🛵", mins: 40, fx: { vibes: 8, social: 12 }, conn: 2 },
+    neighbour_gist: { name: "Gist with the neighbours", icon: "🗣️", mins: 30, gossip: 1, fx: { social: 10 }, special: "discover" },
     // The Luxury Zone (Victoria Island & Eko Atlantic).
     browse_drop: { name: "Browse the numbered drop", icon: "💎", mins: 0, special: "concept" },
     buy_wristband: { name: "Buy an all-access wristband", icon: "🎫", mins: 10, cost: 150000, gives: "vip_band", clout: 2 },
@@ -302,6 +313,7 @@
     tiny_bag: { name: "Tiny Y2K bag", icon: "👛", kind: "bag", clout: 2, price: 35000 },
     gold_watch: { name: "Gold watch", icon: "⌚", kind: "jewelry", clout: 5, price: 200000 },
     chain: { name: "Gold chain", icon: "📿", kind: "jewelry", clout: 2, price: 45000 },
+    headphones: { name: "Noise-cancelling headphones", icon: "🎧", kind: "gear" },
     // Numbered concept-store pieces: wearable, and each one opens doors.
     ltd_silk: { name: "Eko Atlantic silk shirt", icon: "👔", kind: "limited", clout: 6, price: 350000, edition: 100, key: { sponsor: "Lagos Luxe Spirits", pay: 60000 } },
     ltd_blazer: { name: "Hand-dyed adire blazer", icon: "🧥", kind: "limited", clout: 8, price: 480000, edition: 50, key: { invite: 2 } },
@@ -325,7 +337,7 @@
     { id: "c_ruvu", name: "DJ Ruvu", title: "Superstar DJ", icon: "🎧", gain: 12000, gate: { car: true, standing: 4 }, gateText: "Ruvu only rolls with people who pulled up in a whip. (Rent a car, or Social Standing 4)",
       look: { body: "man", skin: 3, hair: "waves", hairColour: "black", style: "resort", colour: 8, fabric: "adire", shades: true, gele: false, beard: null, build: "regular" } },
   ];
-  const LUXURY_SPOTS = ["beachclub", "lounge", "shortlet", "restaurant", "conceptstore", "club"];
+  const LUXURY_SPOTS = ["beachclub", "lounge", "shortlet", "restaurant", "conceptstore", "club", "lekkilounge"];
   const STANDING = [
     { name: "Nobody", icon: "🫥", min: 0 }, { name: "Known Face", icon: "🙂", min: 40 }, { name: "Hot Gist", icon: "🔥", min: 85 },
     { name: "Big Deal", icon: "💫", min: 140 }, { name: "Elite", icon: "💎", min: 200 }, { name: "Icon", icon: "👑", min: 280 },
@@ -595,6 +607,7 @@
     ijgb_exposed: { name: "IJGB Exposed", icon: "🇬🇧", desc: "Expose a fake IJGB." },
     lover: { name: "December Lover", icon: "💞", desc: "Start a relationship." },
     starstruck: { name: "Starstruck", icon: "🤩", desc: "Got a selfie or Reel with a celebrity." },
+    lekki_legend: { name: "Lekki Legend", icon: "🌴", desc: "Showed up when your friends called, even when you were broke." },
     last_standing: { name: "Last Man Standing", icon: "🌅", desc: "Still partying at 4am." },
     jollof: { name: "Jollof Royalty", icon: "🥘", desc: "Cook party jollof 3 times." },
     airport: { name: "Airport Legend", icon: "✈️", desc: "Pick up every arriving relative yourself." },

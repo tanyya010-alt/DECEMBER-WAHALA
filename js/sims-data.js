@@ -36,6 +36,13 @@
 
   // Timed moodlets: emotion, weight and how long they last (hours).
   const MOODLETS = {
+    stressed: { emotion: "tense", w: 2, h: 1, label: "Stressed Out", icon: "😤" },
+    fomo: { emotion: "tense", w: 2, h: 6, label: "FOMO (slower energy recovery)", icon: "🥲" },
+    showed_up: { emotion: "happy", w: 2, h: 4, label: "Showed Up for the Crew", icon: "🫶🏾" },
+    flat_drama: { emotion: "angry", w: 2, h: 4, label: "Flatmate Wahala", icon: "🍲" },
+    no_sleep_noise: { emotion: "angry", w: 2, h: 4, label: "Neighbour Kept Me Up", icon: "🔊" },
+    sweet_encounter: { emotion: "flirty", w: 2, h: 5, label: "Someone Smiled at Me", icon: "😊" },
+    near_fight: { emotion: "tense", w: 2, h: 3, label: "Almost Got Into a Fight", icon: "😬" },
     fit_approved: { emotion: "confident", w: 2, h: 4, label: "Fit Approved", icon: "💅🏾" },
     cheap_fit: { emotion: "embarrassed", w: 2, h: 3, label: "Failed the Fit Check", icon: "🙈" },
     debtor: { emotion: "tense", w: 3, h: 6, label: "Owing Money", icon: "💸" },
@@ -92,6 +99,7 @@
 
   // Moodlets that come from doing things.
   const ACTION_MOODLETS = {
+    lekki_hangout: "ate_well", lekki_lounge_chat: "laughed", lekki_club_night: "partied", house_party: "partied", street_hang: "laughed",
     chef_tasting: "great_food", styling_session: "fit_approved", buy_wristband: "big_spender", store_network: "flirted",
     eat_amala: "ate_well", fast_food: "ate_well", family_food: "ate_well", coffee: "ate_well", suya: "ate_well", takeaway_jollof: "ate_well",
     fine_dining: "great_food", owambe_eat: "great_food", christmas_lunch: "christmas",
@@ -173,6 +181,7 @@
     hustle: { name: "Hustle", icon: "💼", desc: "Gigs and deals pay more." },
   };
   const SKILL_OF = {
+    lekki_lounge_chat: "charisma", lekki_club_night: "dancing", house_party: "dancing", neighbour_gist: "charisma",
     store_network: "charisma", styling_session: "photography",
     cook: "cooking", takeaway_jollof: null,
     party: "dancing", dance: "dancing", owambe_attend: "dancing", beach_party: "dancing", dance_home: "dancing", concert: "dancing",
@@ -202,6 +211,7 @@
 
   // How your Sim looks while doing each action.
   const POSES = {
+    lekki_hangout: "eat", lekki_lounge_chat: "talk", lekki_club_night: "dance", house_party: "dance", street_hang: "talk", neighbour_gist: "talk",
     chef_tasting: "eat", styling_session: "stand", store_network: "talk", buy_wristband: "stand",
     eat_amala: "eat", fine_dining: "eat", fast_food: "eat", coffee: "eat", family_food: "eat", owambe_eat: "eat", suya: "eat", christmas_lunch: "eat",
     sleep: "lie", nap: "lie", tv: "sit", laptop_work: "sit", remote_work: "sit", work_shift: "sit", service: "sit", sunset_drinks: "sit", vip: "sit", new_hair: "sit", salon_gossip: "sit", pool_day: "lie", chill: "sit", visit_family: "sit", lobby_network: "sit", cinema: "hide", picnic: "sit",
@@ -357,6 +367,17 @@
     ] },
     // The IJGB luxury shortlet penthouse: double-height glass, glossy white floors,
     // open-plan kitchen and wine wall, floating stairs over an indoor garden.
+    // Neon Palm, Lekki: restaurant up front, lounge sofas, club floor at the back.
+    lekkilounge: { w: 20, d: 14, floor: ["#231a33", "#2c2140"], wall: "#1a1426", light: 0xff6ad5, dark: true, objects: [
+      tableSet(-6.5, 3.2, ["lekki_hangout", "lekki_lounge_chat"]), tableSet(-2.5, 3.2, ["lekki_hangout"]), tableSet(-6.5, -0.6, ["lekki_hangout", "lekki_lounge_chat"]),
+      T("dancefloor", 3.2, -1.6, ["lekki_club_night", "dance"], { label: "Club floor", icon: "💃🏾", w: 7, d: 5, seats: [[1.4, -3, 0, "dance"], [3.2, -2.6, 0, "dance"], [5, -3, 0, "dance"], [2, -0.6, 0, "dance"], [4.4, -0.4, 0, "dance"], [3.2, 0.4, 0, "dance"]] }),
+      T("dj", 3.2, -5.8, ["request_song"], { label: "DJ booth", icon: "🎧", vendorSpot: [3.2, -6.4, 0] }),
+      T("bar", 8.6, 1.5, ["drinks", "lekki_lounge_chat"], { label: "Neon bar", icon: "🍸", w: 1.4, d: 6, seats: [[7.4, -0.4, Math.PI / 2, "drink"], [7.4, 1.5, Math.PI / 2, "drink"], [7.4, 3.4, Math.PI / 2, "drink"]], vendorSpot: [9.4, 1.5, -Math.PI / 2] }),
+      T("couch", -8.6, -4.4, ["lekki_lounge_chat", "sit_chill"], { label: "Lounge corner", icon: "🛋️", seats: [[-9.2, -3.6, Math.PI / 2, "sit"], [-9.2, -5.2, Math.PI / 2, "sit"]] }),
+      T("photowall", -3.6, -5.8, ["club_photos"], { label: "Neon photo wall", icon: "📸" }),
+      T("plant", -9.2, 5.8, [], {}), T("plant", 9.2, 5.8, [], {}),
+      T("toilet", 8.8, -5.4, ["toilet"], { label: "Toilets", icon: "🚽" }),
+    ] },
     // Designer concept store: numbered drops under glass, a stylist and a velvet-roped launch lounge.
     conceptstore: { w: 16, d: 11, floor: ["#efe9df", "#e6dfd3"], wall: "#f7f3ec", light: 0xfff4e2, objects: [
       T("vitrine", -5.4, -3.8, ["browse_drop"], { label: "Numbered drop", icon: "💎" }),
@@ -490,10 +511,12 @@
     concert: [{ label: "Main stage", icon: "🎤", act: ["concert", "concert_photo_gig", "resell_tickets", "crossover"] }],
     beach: [{ label: "Beach", icon: "🏖️", act: ["chill", "picnic", "beach_party", "beach_photos", "crossover"] }],
     photo: [{ label: "Detty Wall", icon: "📸", act: ["photoshoot", "collab"] }],
+    lekkistreet: [{ label: "Party house", icon: "🏠", act: ["house_party"] }, { label: "The close", icon: "🛵", act: ["street_hang", "neighbour_gist"] }],
   };
 
   // Venue atmosphere moodlets (no timer: they last while you're there).
   const ATMOSPHERE = {
+    lekkilounge: { emotion: "playful", w: 1, label: "Lekki Energy", icon: "🌴" },
     conceptstore: { emotion: "confident", w: 1, label: "Retail Therapy", icon: "💎" },
     club: { emotion: "playful", w: 1, label: "Party Atmosphere", icon: "🪩", night: true },
     lounge: { emotion: "energized", w: 1, label: "Rooftop Energy", icon: "🌃" },

@@ -44,6 +44,7 @@ for (let seed = 1; seed <= RUNS; seed++) {
     assert(++steps < 40000, `seed ${seed} (${persona}): stuck at ${g.clock().day} ${g.clock().label}`);
     const s = g.s;
     if (s.event) {
+      seen.events = seen.events || {}; seen.events[s.event.title] = (seen.events[s.event.title] || 0) + 1;
       const ok = s.event.choices.map((c, i) => i).filter((i) => g.canChoose(s.event.choices[i]));
       assert(ok.length, `seed ${seed}: event "${s.event.title}" has no affordable choice`);
       if (s.event.chain) seen.chains.add(s.event.chain);
@@ -116,6 +117,9 @@ for (let seed = 1; seed <= RUNS; seed++) {
   }
   if (g.s.celebState) seen.celebsMet = (seen.celebsMet || 0) + Object.values(g.s.celebState).filter((c) => c.met).length;
   seen.limited = (seen.limited || 0) + g.limitedCount();
+  seen.fomo = (seen.fomo || 0) + (g.s.stats.fomoShows || 0);
+  seen.stressMax = Math.max(seen.stressMax || 0, Math.round(g.s.stress));
+  assert(Number.isFinite(g.s.stress), `seed ${seed}: stress`);
   if (g.s.flags.fitDoor) seen.fitChecks = (seen.fitChecks || 0) + Object.keys(g.s.flags.fitDoor).length;
   const e = g.s.ending;
   assert(e && Number.isFinite(e.score) && e.bio, `seed ${seed}: bad ending`);
@@ -133,6 +137,7 @@ console.log(`  distinct actions used: ${seen.actions.size} · story chains reach
 console.log(`  socials: ${Object.keys(seen.socials).length} kinds, ${Object.values(seen.socials).reduce((a, b) => a + b, 0)} total · approaches seen: ${seen.approaches} · furniture bought: ${seen.furniture}`);
 console.log(`  emotions felt: ${[...seen.emotions].join(", ")}`);
 console.log(`  best skill levels: ${JSON.stringify(seen.skills)}`);
+console.log(`  lekki: actions ${["lekki_hangout", "lekki_lounge_chat", "lekki_club_night", "house_party", "street_hang", "neighbour_gist"].filter((a) => seen.actions.has(a)).join(", ")} · fomo show-ups ${seen.fomo} · max stress ${seen.stressMax} · events ${["Someone Smiles at You…", "Wrong Crowd", "Your Flatmate Ate Your Soup", "Neighbour Blasting Music at 3 AM", "Landlord Wants an Inspection Tomorrow", "Flatmate Won't Pay the Light Bill"].map((t) => `${t.split(" ").slice(0, 2).join(" ")}:${(seen.events || {})[t] || 0}`).join(" ")}`);
 console.log(`  luxury zone: minigames ${seen.minigames || 0} · celebs met ${seen.celebsMet || 0} · numbered pieces ${seen.limited || 0} · fit checks ${seen.fitChecks || 0} · actions: ${["dj_set", "celeb_selfie", "celeb_reel", "chef_tasting", "browse_drop", "buy_wristband", "styling_session", "store_network"].filter((a) => seen.actions.has(a)).join(", ")}`);
 // Old (v3, pre-life-sim) saves load and gain the new fields.
 {
