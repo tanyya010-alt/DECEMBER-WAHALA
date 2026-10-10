@@ -93,7 +93,7 @@
     service: "blessed", pray: "blessed", carol: "blessed",
     salon_gossip: "gossip", owambe_gossip: "gossip", gist_vendor: "gossip",
     new_hair: "complimented", start_drama: "argued", sunset_drinks: "flirted", host: "partied",
-    firepit_chill: "laughed", rooftop_party: "partied", pool_swim: "fresh", daybed_lounge: "entertained", beach_brunch: "great_food", sundowner: "flirted", vip_cabana: "big_spender", beachclub_party: "partied",
+    firepit_chill: "laughed", rooftop_party: "partied", chef_dinner: "great_food", wine_tasting: "flirted", movie_night: "entertained", content_shoot: "inspired_art", penthouse_party: "partied", book_penthouse: "big_spender", pool_swim: "fresh", daybed_lounge: "entertained", beach_brunch: "great_food", sundowner: "flirted", vip_cabana: "big_spender", beachclub_party: "partied",
   };
 
   // What each emotion does. soc: social success; cats: per-category bonus;
@@ -166,7 +166,7 @@
   const SKILL_OF = {
     cook: "cooking", takeaway_jollof: null,
     party: "dancing", dance: "dancing", owambe_attend: "dancing", beach_party: "dancing", dance_home: "dancing", concert: "dancing",
-    workout: "fitness", chores: "fitness", pool_swim: "fitness", beachclub_party: "dancing", rooftop_party: "dancing", firepit_chill: "charisma",
+    workout: "fitness", chores: "fitness", pool_swim: "fitness", beachclub_party: "dancing", rooftop_party: "dancing", firepit_chill: "charisma", content_shoot: "photography", penthouse_party: "charisma", wine_tasting: "charisma",
     post_home: "photography", club_photos: "photography", beach_photos: "photography", photoshoot: "photography", collab: "photography",
     work_shift: "hustle", sell_phones: "hustle", delivery: "hustle", small_chops: "hustle", conductor_gig: "hustle", event_setup: "hustle", concert_photo_gig: "photography", resell_tickets: "hustle", broker: "hustle", remote_work: "hustle", laptop_work: "hustle",
     gist_vendor: "charisma", salon_gossip: "charisma", owambe_network: "charisma", club_network: "charisma", lounge_network: "charisma", lobby_network: "charisma", gym_network: "charisma", practice_speech: "charisma", restaurant_meet: "charisma", cafe_meet: "charisma", mall_meet: "charisma", office_gist: "charisma",
@@ -197,7 +197,7 @@
     post_home: "phone", club_photos: "phone", beach_photos: "phone", photoshoot: "phone", collab: "phone",
     pray: "pray", carol: "sing", party: "dance", dance: "dance", owambe_attend: "dance", beach_party: "dance", concert: "dance",
     workout: "workout", chores: "workout", cook: "cook", takeaway_jollof: "stand",
-    firepit_chill: "sit", rooftop_party: "dance", pool_swim: "swim", daybed_lounge: "lie", beach_brunch: "eat", sundowner: "drink", vip_cabana: "sit", beachclub_party: "dance",
+    firepit_chill: "sit", rooftop_party: "dance", chef_dinner: "eat", wine_tasting: "drink", movie_night: "sit", content_shoot: "phone", penthouse_party: "dance", pool_swim: "swim", daybed_lounge: "lie", beach_brunch: "eat", sundowner: "drink", vip_cabana: "sit", beachclub_party: "dance",
   };
 
   // ------------------------------------------------------------ social interactions
@@ -344,6 +344,21 @@
       T("photowall", -6.6, 3.8, ["club_photos"], { label: "Photo wall", icon: "📸" }),
       T("toilet", 7.6, 6, ["toilet"], { label: "Toilets", icon: "🚽" }),
     ] },
+    // The IJGB luxury shortlet penthouse: double-height glass, glossy white floors,
+    // open-plan kitchen and wine wall, floating stairs over an indoor garden.
+    shortlet: { w: 26, d: 18, glass: true, height: 5.2, floor: ["#f6f7f9", "#eef0f3"], wall: "#f7f7f5", light: 0xffffff, objects: [
+      T("kitchen", 6.5, -7.9, ["chef_dinner", "cook", "snack"], { label: "Chef's kitchen", icon: "👨🏾‍🍳", w: 9, d: 1.2, vendorSpot: [6.5, -6.9, Math.PI] }),
+      T("island", 6.5, -4.4, ["chef_dinner", "wine_tasting"], { label: "Kitchen island", icon: "🍸", w: 5, d: 1.4, seats: [[4.9, -3.2, Math.PI, "sit"], [6.5, -3.2, Math.PI, "sit"], [8.1, -3.2, Math.PI, "sit"]] }),
+      T("dining", 6.5, 0.6, ["chef_dinner", "penthouse_party"], { label: "Dining table", icon: "🍽️", w: 6, d: 1.6, seats: [[4.2, -0.6, 0, "sit"], [6.5, -0.6, 0, "sit"], [8.8, -0.6, 0, "sit"], [4.2, 1.8, Math.PI, "sit"], [6.5, 1.8, Math.PI, "sit"], [8.8, 1.8, Math.PI, "sit"]] }),
+      T("winewall", -12, -2.8, ["wine_tasting"], { label: "Wine wall", icon: "🍷", w: 1.1, d: 4.6 }),
+      T("stairs", -7.6, -7.2, ["content_shoot"], { label: "Floating staircase", icon: "🤳🏾", w: 5, d: 2.6 }),
+      T("tv", -2.6, -4.6, ["movie_night", "tv"], { label: "Cinema screen", icon: "🎬", w: 3, d: 0.8 }),
+      T("sectional", -2.6, 0.4, ["movie_night", "sit_chill", "penthouse_party"], { label: "Sectional sofa", icon: "🛋️", w: 6, d: 3, seats: [[-3.6, 0.6, Math.PI, "sit"], [-2.3, 0.6, Math.PI, "sit"], [-1.0, 0.6, Math.PI, "sit"], [0.0, 0.6, Math.PI, "sit"], [-4.7, -0.5, Math.PI / 2, "sit"]] }),
+      T("bedlux", 9.6, 6.2, ["sleep", "nap"], { label: "Master bed", icon: "🛏️", seats: [[9.6, 6.3, 0, "lie"]] }),
+      T("curvechairs", 3.6, 6.6, ["sit_chill", "content_shoot"], { label: "Lounge chairs", icon: "🛋️", w: 3.6, d: 1.6, seats: [[2.6, 6.4, Math.PI, "sit"], [4.6, 6.4, Math.PI, "sit"]] }),
+      T("concierge", -1.6, 7.6, ["book_penthouse"], { label: "Concierge tablet", icon: "🔑" }),
+      T("shower", -11.6, 7.4, ["shower", "toilet"], { label: "Spa bathroom", icon: "🛁" }),
+    ] },
     // High-octane rooftop club and DJ hub, open to the city skyline.
     lounge: { w: 26, d: 18, open: true, setting: "rooftop", floor: ["#5c6168", "#52575e"], wall: "#6b7078", light: 0xffc46b, stringLights: true, objects: [
       T("djstage", 0, -7.4, ["request_song"], { label: "DJ hub", icon: "🎛️", w: 8, d: 2.6, vendorSpot: [0, -7.6, 0] }),
@@ -458,6 +473,7 @@
   const ATMOSPHERE = {
     club: { emotion: "playful", w: 1, label: "Party Atmosphere", icon: "🪩", night: true },
     lounge: { emotion: "energized", w: 1, label: "Rooftop Energy", icon: "🌃" },
+    shortlet: { emotion: "confident", w: 1, label: "Living Large", icon: "🥂" },
     hall: { emotion: "happy", w: 1, label: "Owambe Energy", icon: "🎊" },
     concert: { emotion: "energized", w: 1, label: "Crowd Energy", icon: "🎤" },
     beach: { emotion: "happy", w: 1, label: "Sea Breeze", icon: "🌊" },

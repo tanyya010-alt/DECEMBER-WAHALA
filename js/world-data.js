@@ -49,6 +49,7 @@
     beach: { icon: "🏖️", kind: "open", hours: [hm("08:00"), hm("19:00")], actions: ["chill", "beach_party", "picnic", "beach_photos"] },
     photo: { icon: "📸", kind: "open", hours: null, actions: ["photoshoot", "collab"] },
     airport: { icon: "✈️", kind: "remote", hours: null, actions: ["pickup", "watch_arrivals"] },
+    shortlet: { icon: "🔑", kind: "building", h: 8, color: "#f4f4f2", roof: "#8a6b4a", hours: null, actions: ["book_penthouse", "chef_dinner", "wine_tasting", "movie_night", "content_shoot", "penthouse_party"] },
     beachclub: { icon: "🏝️", kind: "building", h: 4, color: "#fbf7ef", roof: "#d8a93b", hours: [hm("10:00"), hm("27:00")], actions: ["pool_swim", "daybed_lounge", "beach_brunch", "sundowner", "vip_cabana", "beachclub_party"] },
   };
 
@@ -72,7 +73,7 @@
       bdc: "Mallam Musa BDC", mall: "Palms Mall", fashion: "Àṣà Fashion House", cafe: "Bean & Breeze Café",
       restaurant: "Island Grill", fastfood: "Chop Republic", suya: "Mallam Suya Spot", club: "Club Eko",
       concert: "Eko Atlantic Festival Grounds", lounge: "Sky Rooftop Lounge", beach: "Oniru Beach",
-      photo: "The Detty Wall", airport: "Murtala Muhammed Airport", beachclub: "Eko Shores Beach Club",
+      photo: "The Detty Wall", airport: "Murtala Muhammed Airport", beachclub: "Eko Shores Beach Club", shortlet: "Ocean Crest Penthouse",
     },
     abuja: {
       family: "Family House", home: "Your Flat", mamaput: "Mama Cass Kitchen", salon: "Wuse Cuts & Curls", gym: "Capital Fitness",
@@ -81,7 +82,7 @@
       bdc: "Zone 4 BDC", mall: "Jabi Lake Mall", fashion: "Àṣà Fashion House", cafe: "Bean & Breeze Café",
       restaurant: "Wuse 2 Grill", fastfood: "Chop Republic", suya: "Area 11 Suya", club: "Club Maitama",
       concert: "Eagle Square Concert Grounds", lounge: "Sky Lounge Maitama", beach: "Jabi Lakeside",
-      photo: "Millennium Park Arch", airport: "Nnamdi Azikiwe Airport", beachclub: "Jabi Shores Lakeside Club",
+      photo: "Millennium Park Arch", airport: "Nnamdi Azikiwe Airport", beachclub: "Jabi Shores Lakeside Club", shortlet: "Maitama Hills Penthouse",
     },
   };
 
@@ -104,6 +105,7 @@
     out.beach = { id: "beach", type: "beach", name: NAMES[city].beach, icon: TYPES.beach.icon, kind: "open", x: -8, z: 56, w: 40, d: 10, h: 0, side: "N", door: { x: -8, z: 54 }, spot: { x: -8, z: 55 } };
     out.photo = { id: "photo", type: "photo", name: NAMES[city].photo, icon: TYPES.photo.icon, kind: "open", x: 40, z: 56, w: 12, d: 8, h: 0, side: "N", door: { x: 40, z: 54 }, spot: { x: 40, z: 55 } };
     out.beachclub = { id: "beachclub", type: "beachclub", name: NAMES[city].beachclub, icon: TYPES.beachclub.icon, kind: "building", x: 23, z: 56.5, w: 18, d: 9, h: 4, side: "N", door: { x: 23, z: 51.4 }, spot: { x: 23, z: 50.2 } };
+    out.shortlet = { id: "shortlet", type: "shortlet", name: NAMES[city].shortlet, icon: TYPES.shortlet.icon, kind: "building", x: -48, z: 56.5, w: 18, d: 9, h: 8, side: "N", door: { x: -48, z: 51.4 }, spot: { x: -48, z: 50.2 } };
     out.airport = { id: "airport", type: "airport", name: NAMES[city].airport, icon: TYPES.airport.icon, kind: "remote", x: -66, z: -50, w: 0, d: 0, h: 0, side: "N", door: { x: -66, z: -50 }, spot: { x: -66, z: -50 }, remote: true };
     return out;
   }
@@ -204,6 +206,13 @@
     event_setup: { name: "Event setup gig", icon: "🪑", mins: 240, fx: { energy: -22 }, gig: 30000, gigType: "setup" },
     // Hotel
     book_night: { name: "Book a room for tonight", icon: "🛏️", mins: 10, cost: 85000, special: "hotelnight" },
+    // The IJGB luxury shortlet penthouse.
+    book_penthouse: { name: "Book the penthouse for tonight", icon: "🔑", mins: 10, cost: 350000, clout: 6, special: "penthouse" },
+    chef_dinner: { name: "Private chef dinner", icon: "👨🏾‍🍳", mins: 90, cost: 60000, fx: { belle: 60, vibes: 16, social: 6 }, food: true, clout: 2 },
+    wine_tasting: { name: "Wine tasting at the wine wall", icon: "🍷", mins: 40, cost: 30000, fx: { vibes: 12, social: 6 }, clout: 1 },
+    movie_night: { name: "Movie night on the big screen", icon: "🎬", mins: 120, fx: { vibes: 20, energy: 6 } },
+    content_shoot: { name: "Shoot content for the 'gram", icon: "🤳🏾", mins: 40, special: "post", clout: 3 },
+    penthouse_party: { name: "Throw a penthouse party", icon: "🥂", mins: 240, cost: 180000, fx: { vibes: 40, energy: -20, social: 30 }, clout: 12, conn: 8, big: true, needsBooking: true, special: "host" },
     // VIP Beach Club: day-to-night zones.
     pool_swim: { name: "Swim in the infinity pool", icon: "🏊🏾", mins: 45, fx: { vibes: 14, energy: -6, hygiene: 10 }, clout: 1 },
     daybed_lounge: { name: "Lounge on a daybed", icon: "🏖️", mins: 60, cost: 15000, fx: { energy: 10, vibes: 10 }, window: [10, 19] },

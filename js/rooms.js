@@ -32,6 +32,7 @@
     kiosk: [3, 1.2], cinema: [6, 0.4], bench: [2.4, 0.7], xtree: [1.6, 1.6], rack: [4, 0.8], mirror: [1, 0.3], salonchair: [1, 1],
     dryer: [1, 2.8], treadmill: [1, 2], weights: [3.5, 1], cooler: [0.6, 0.6], altar: [3, 1.2], choir: [3, 1.4], pew: [3.6, 0.8],
     stage: [8, 2], crates: [1.6, 1.6], pool: [6, 3.6], bike: [0.7, 1.8], door: [2.2, 0.3],
+    kitchen: [9, 1.2], island: [5, 1.4], dining: [6, 1.6], winewall: [1.1, 4.6], stairs: [5, 2.6], sectional: [6, 3], bedlux: [4.4, 3.8], curvechairs: [3.6, 1.6], concierge: [0.8, 0.6],
   };
   const WALKABLE = new Set(["dancefloor", "choir", "door", "photowall", "dancedeck"]);
 
@@ -47,12 +48,28 @@
     const sph = (r, c) => new THREE.Mesh(new THREE.SphereGeometry(r, 10, 8), typeof c === "number" ? lam(c) : c);
 
     // Floor, walls (the two facing the camera drop down, like The Sims).
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(RW, RD), new THREE.MeshLambertMaterial({ map: T.open ? tile(T.floor[0], T.floor[1], RW / 6, RD * 1.4) : tile(T.floor[0], T.floor[1], RW / 2, RD / 2) }));
+    const floorMat = T.glass ? new THREE.MeshPhongMaterial({ map: tile(T.floor[0], T.floor[1], RW / 3, RD / 3), shininess: 110, specular: 0x9a9a9a })
+      : new THREE.MeshLambertMaterial({ map: T.open ? tile(T.floor[0], T.floor[1], RW / 6, RD * 1.4) : tile(T.floor[0], T.floor[1], RW / 2, RD / 2) });
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(RW, RD), floorMat);
     floor.rotation.x = -Math.PI / 2; floor.userData.floor = true; g.add(floor);
-    put(box(RW + 0.6, 0.5, RD + 0.6, 0x8d6e63), 0, -0.26, 0);
+    put(box(RW + 0.6, 0.5, RD + 0.6, T.glass ? 0xe8e8e6 : 0x8d6e63), 0, -0.26, 0);
     const wallMat = new THREE.MeshLambertMaterial({ color: new THREE.Color(T.wall) });
-    const H = 3.4;
+    const H = T.height || 3.4;
+    const glassMat = new THREE.MeshLambertMaterial({ color: 0xd6ecf7, transparent: true, opacity: 0.16, depthWrite: false });
     const wall = (w, d, x, z, nx, nz) => {
+      if (T.glass && !(nx < 0)) { // floor-to-ceiling glass with black mullions; the left wall stays solid
+        const gw = new THREE.Group(); put(gw, x, H / 2, z);
+        const along = w > d, len = along ? w : d;
+        const bar = (l, h, px, py) => { const b = box(along ? l : 0.08, h, along ? 0.08 : l, 0x1c1c1e); b.position.set(along ? px : 0, py, along ? 0 : px); gw.add(b); };
+        const pane = box(w, H, d, glassMat); gw.add(pane);
+        const n = Math.max(1, Math.round(len / 2.6));
+        for (let i = 0; i <= n; i++) bar(0.08, H, -len / 2 + (i * len) / n, 0);
+        bar(len, 0.1, 0, H / 2 - 0.05); bar(len, 0.1, 0, -H / 2 + 0.05); bar(len, 0.06, 0, -H / 2 + 3.1);
+        gw.traverse((m) => { if (m.isMesh) m.userData.wall = { nx, nz, h: H }; });
+        gw.userData.wall = { nx, nz, h: H };
+        walls.push(gw);
+        return gw;
+      }
       if (T.open) { // open-air venues get a low balustrade instead of walls
         if (T.setting === "rooftop") { put(box(w, 0.9, d, 0x8a8f96), x, 0.45, z); put(box(w, 0.6, d, new THREE.MeshLambertMaterial({ color: 0xcfe8ff, transparent: true, opacity: 0.3 })), x, 1.2, z); put(box(w, 0.05, d + 0.04, 0x2f3238), x, 1.52, z); return null; }
         put(box(w, 1.0, d, new THREE.MeshLambertMaterial({ color: 0xcfe8ff, transparent: true, opacity: 0.35 })), x, 0.5, z);
@@ -73,7 +90,7 @@
     colliders.push({ x0: -RW / 2 - 2, x1: RW / 2 + 2, z0: -RD / 2 - 2, z1: -RD / 2 + 0.15 }, { x0: -RW / 2 - 2, x1: -RW / 2 + 0.15, z0: -RD / 2 - 2, z1: RD / 2 + 2 }, { x0: RW / 2 - 0.15, x1: RW / 2 + 2, z0: -RD / 2 - 2, z1: RD / 2 + 2 });
     colliders.push({ x0: -RW / 2 - 2, x1: -1.1, z0: RD / 2 - 0.15, z1: RD / 2 + 2 }, { x0: 1.1, x1: RW / 2 + 2, z0: RD / 2 - 0.15, z1: RD / 2 + 2 }, { x0: -1.1, x1: 1.1, z0: RD / 2 + 0.6, z1: RD / 2 + 2 });
     // Windows on the back wall (lit venues).
-    if (!T.dark && !T.open) for (let x = -RW / 2 + 2.5; x < RW / 2 - 1.5; x += 4.2) put(box(1.6, 1.3, 0.05, 0xbfe3ff), x, 2.1, -RD / 2 + 0.15);
+    if (!T.dark && !T.open && !T.glass) for (let x = -RW / 2 + 2.5; x < RW / 2 - 1.5; x += 4.2) put(box(1.6, 1.3, 0.05, 0xbfe3ff), x, 2.1, -RD / 2 + 0.15);
     // Skirting and a doormat.
 
     // ------------------------------------------------------------ objects
@@ -116,6 +133,12 @@
           P(box(big ? 2.8 : 1.6, big ? 1.6 : 1.0, 0.08, 0x111111), 0, big ? 1.5 : 1.15, -0.25);
           const scr = P(box(big ? 2.6 : 1.45, big ? 1.4 : 0.85, 0.02, glow(0x2a3f6e)), 0, big ? 1.5 : 1.15, -0.2);
           anim.tiles.push({ mat: scr.material, kind: "tv" });
+          if (type === "shortlet") { // slatted oak feature wall with vertical LED strips
+            P(box(4.2, 3.6, 0.12, 0x3a2a1e), 0, 1.8, -0.5);
+            for (let i = 0; i < 18; i++) P(box(0.12, 3.5, 0.08, 0xa8794f), -1.95 + i * 0.23, 1.8, -0.42);
+            [-2.15, 2.15].forEach((x) => { const m = glow(0x888888); anim.tiles.push({ mat: m, kind: "led", col: 0xffe2b0, day: 0xf0e6d6 }); P(box(0.06, 3.5, 0.06, m), x, 1.8, -0.4); });
+            const ul = glow(0x888888); anim.tiles.push({ mat: ul, kind: "led", col: 0xffe2b0, day: 0xf0e6d6 }); P(box(3, 0.04, 0.04, ul), 0, 0.02, 0.41);
+          }
           if (type === "home" && tier >= 2) { P(box(0.45, 0.1, 0.35, 0xffffff), 0.9, 0.65, 0.1); P(box(0.18, 0.05, 0.12, 0x111111), 0.4, 0.63, 0.25); }
           break;
         }
@@ -362,6 +385,105 @@
           P(box(0.78, 0.5, 0.12, 0xffffff), 0, 0.7, -0.75).rotation.x = -0.6;
           P(new THREE.Mesh(new THREE.ConeGeometry(1.1, 0.4, 10), lam(0xffffff)), 0.9, 2.3, 0); P(cyl(0.03, 0.03, 2.2, 0xd8a93b, 5), 0.9, 1.1, 0);
           break;
+        // ---- IJGB penthouse pieces
+        case "kitchen": {
+          P(box(w, 0.95, d, 0xf5f5f3), 0, 0.48, 0);
+          P(box(w + 0.05, 0.06, d + 0.05, 0x1d1d1f), 0, 0.98, 0);
+          [-w / 2 + 0.45, w / 2 - 0.45].forEach((x) => P(box(0.9, 3.2, d, 0xf5f5f3), x, 1.6, 0));
+          P(box(w - 1.8, 0.9, 0.5, 0xf5f5f3), 0, 2.7, -d / 2 + 0.25);
+          const cove = glow(0x888888); anim.tiles.push({ mat: cove, kind: "led", col: 0xfff1d6, day: 0xf2f2f2 }); P(box(w - 1.8, 0.04, 0.06, cove), 0, 2.22, -d / 2 + 0.5);
+          P(box(1.6, 0.04, 0.6, 0x9aa0a6), -1.6, 1.02, 0); P(box(1.4, 0.03, 0.7, 0x111111), 1.6, 1.02, 0); // sink and hob
+          P(box(1.4, 0.5, 0.6, 0xd8d8d8), 1.6, 2.1, -0.2);
+          P(cyl(0.18, 0.16, 0.3, 0xb0b0b0), 1.3, 1.18, 0.1); P(box(0.5, 0.35, 0.08, 0x2a2a2a), -3.2, 1.2, -0.3);
+          break;
+        }
+        case "island": {
+          P(box(w, 0.95, d, 0xf3f3f1), 0, 0.48, 0);
+          P(box(w + 0.1, 0.08, d + 0.1, 0xb9bcc2), 0, 0.99, 0);
+          [-w / 2, w / 2].forEach((x) => P(box(0.08, 1.02, d + 0.1, 0xb9bcc2), x, 0.5, 0)); // waterfall ends
+          P(cyl(0.22, 0.2, 0.25, 0x2f6b3c), -1.6, 1.16, 0); P(sph(0.22, 0x3f9b4f), -1.6, 1.42, 0);
+          [0.4, 0.8].forEach((x) => { P(cyl(0.03, 0.03, 0.3, 0x5b1a2a, 6), x, 1.18, -0.2); P(cyl(0.05, 0.03, 0.12, new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 }), 8), x + 0.2, 1.1, -0.1); });
+          (o.seats || []).forEach(([sx, sz]) => { P(cyl(0.24, 0.24, 0.08, 0x2b2b2b, 12), sx - o.x, 0.78, sz - o.z); P(cyl(0.04, 0.04, 0.78, 0xc0c0c0, 6), sx - o.x, 0.39, sz - o.z); P(new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.02, 4, 12), lam(0xc0c0c0)), sx - o.x, 0.3, sz - o.z).rotation.x = Math.PI / 2; });
+          // Linear LED pendant over the island.
+          const bar = glow(0x999999); anim.tiles.push({ mat: bar, kind: "led", col: 0xfff3dc, day: 0xeeeeee });
+          P(box(w - 0.8, 0.08, 0.12, 0x1c1c1e), 0, 3.6, 0); P(box(w - 0.9, 0.03, 0.1, bar), 0, 3.55, 0);
+          [-1.8, 1.8].forEach((x) => P(cyl(0.008, 0.008, 1.5, 0x333333, 3), x, 4.35, 0));
+          break;
+        }
+        case "dining": {
+          P(box(w, 0.08, d, 0x4a3426), 0, 1.0, 0);
+          [-w / 2 + 0.4, w / 2 - 0.4].forEach((x) => P(box(0.1, 0.96, d - 0.3, 0x1c1c1e), x, 0.48, 0));
+          [-1.8, 0, 1.8].forEach((x) => { P(cyl(0.05, 0.05, 0.2, 0xd8a93b, 6), x, 1.14, 0); P(cyl(0.3, 0.3, 0.02, 0xffffff, 16), x, 1.05, 0.5); });
+          // Hanging cylinder pendants.
+          [-2, -0.7, 0.7, 2].forEach((x, i) => { P(cyl(0.008, 0.008, 1.6, 0x333333, 3), x, 4.0, 0); P(cyl(0.16, 0.16, 0.5, 0x1c1c1e, 12), x, 3.0 - (i % 2) * 0.2, 0); const m = glow(0x777777); anim.tiles.push({ mat: m, kind: "led", col: 0xffd9a0, day: 0xdddddd }); P(cyl(0.14, 0.14, 0.02, m, 12), x, 2.74 - (i % 2) * 0.2, 0); });
+          break;
+        }
+        case "winewall": {
+          P(box(w, 3.4, d, 0x2b2118), 0, 1.7, 0);
+          const back = glow(0x6b5a2a); anim.tiles.push({ mat: back, kind: "led", col: 0xffc56b, day: 0x8a7350 }); P(box(0.05, 3.0, d - 0.3, back), -w / 2 + 0.3, 1.75, 0);
+          for (let r = 0; r < 6; r++) for (let c = 0; c < 8; c++) { const b = P(cyl(0.05, 0.05, 0.5, [0x2e4a2a, 0x5b1a2a, 0x1f2a1f][(r + c) % 3], 6), 0.05, 0.5 + r * 0.45, -d / 2 + 0.45 + c * ((d - 0.9) / 7)); b.rotation.z = Math.PI / 2; }
+          P(box(0.04, 3.1, d - 0.2, new THREE.MeshLambertMaterial({ color: 0xcfe8ff, transparent: true, opacity: 0.25 })), w / 2 + 0.02, 1.75, 0);
+          break;
+        }
+        case "stairs": {
+          // Floating oak treads up to a glass-railed mezzanine, an indoor garden underneath.
+          const steps = 8, run = w / steps, rise = 3.2 / steps;
+          for (let i = 0; i < steps; i++) P(box(run + 0.05, 0.12, d - 0.6, 0xc49a6c), w / 2 - run * (i + 0.5), rise * (i + 1) - 0.06, -0.3);
+          P(box(w, 0.08, 0.06, 0x1c1c1e), 0, 0.04, d / 2 - 0.4);
+          const rail = P(box(w * 1.05, 1.0, 0.04, glassMat), 0, 2.1, d / 2 - 0.55); rail.rotation.z = -Math.atan2(3.2, w);
+          P(box(w - 0.4, 0.15, d - 0.8, 0x6b5a48), 0, 0.08, -0.3);
+          P(box(w - 0.6, 0.06, d - 1.0, 0xcfcac2), 0, 0.17, -0.3); // pebbles
+          for (let i = 0; i < 6; i++) P(new THREE.Mesh(new THREE.IcosahedronGeometry(0.28 + (i % 3) * 0.08, 0), lam([0x3f9b4f, 0x2f7d3c, 0x58b368][i % 3])), -w / 2 + 0.6 + i * 0.75, 0.42, -0.3 + ((i % 2) - 0.5) * 0.5);
+          // Mezzanine slab with a glass balustrade.
+          const mx = -w / 2 - 1.45;
+          P(box(2.9, 0.25, 2.6, 0xf5f5f3), mx, 3.2, -0.3);
+          P(box(2.9, 1.0, 0.04, glassMat), mx, 3.8, 1.0); P(box(2.9, 0.05, 0.06, 0x1c1c1e), mx, 4.3, 1.0);
+          const strip = glow(0x888888); anim.tiles.push({ mat: strip, kind: "led", col: 0xfff1d6, day: 0xf2f2f2 }); P(box(2.9, 0.04, 0.04, strip), mx, 3.06, 1.0);
+          P(cyl(0.25, 0.2, 0.5, 0xf5f5f3), mx - 0.8, 3.58, -0.6); P(sph(0.38, 0x3f9b4f), mx - 0.8, 4.05, -0.6);
+          break;
+        }
+        case "sectional": {
+          const c = 0xcfc6b8, cb = 0xbdb3a3;
+          P(box(w, 0.45, 1.3, c), 0, 0.23, 0.25);
+          P(box(w, 0.85, 0.35, cb), 0, 0.45, 1.07);
+          P(box(1.3, 0.45, 1.1, c), -w / 2 + 0.95, 0.23, -0.95); // chaise towards the screen
+          P(box(0.35, 0.85, d, cb), -w / 2 + 0.18, 0.45, 0);
+          P(box(0.3, 0.65, 1.3, cb), w / 2 - 0.15, 0.33, 0.25);
+          [-1.6, 0.2, 1.8].forEach((x, i) => { P(box(0.6, 0.45, 0.15, i === 1 ? 0x1c1c1e : 0xb8a58c), x, 0.7, 0.8).rotation.x = 0.2; });
+          P(box(1.6, 0.04, 0.9, 0x2a2a2a), 0.6, 0.47, 0.3);
+          // Black bouclé accent chair beside it.
+          P(box(1.0, 0.4, 0.9, 0x1f1f1f), w / 2 + 0.9, 0.2, -0.6); P(box(1.0, 0.7, 0.25, 0x1f1f1f), w / 2 + 0.9, 0.55, -0.15);
+          colliders.push({ x0: o.x + w / 2 + 0.4, x1: o.x + w / 2 + 1.4, z0: o.z - 1.05, z1: o.z - 0.05 });
+          break;
+        }
+        case "bedlux": {
+          const bw = 3.0, bl = 3.6;
+          P(box(bw + 0.1, 0.4, bl, 0x6b6b6b), 0, 0.2, 0);
+          P(box(bw - 0.1, 0.3, bl - 0.3, 0xffffff), 0, 0.55, 0.12);
+          P(box(bw - 0.05, 0.06, 1.1, 0x8a8f96), 0, 0.73, 1.0);
+          [-0.7, 0.7].forEach((x) => P(box(1.0, 0.25, 0.45, 0xf2f2f2), x, 0.82, -bl / 2 + 0.55));
+          // Padded, tufted headboard.
+          P(box(bw + 0.6, 2.0, 0.2, 0xb9b2a6), 0, 1.0, -bl / 2);
+          for (let r = 0; r < 3; r++) for (let c = 0; c < 6; c++) P(box(0.54, 0.54, 0.08, 0xc9c2b6), -1.4 + c * 0.56, 0.6 + r * 0.58, -bl / 2 + 0.12);
+          // Hex side tables with lamps.
+          [-1, 1].forEach((s2) => { P(cyl(0.38, 0.38, 0.6, 0x8a6b4a, 6), s2 * (bw / 2 + 0.55), 0.3, -bl / 2 + 0.5); P(cyl(0.05, 0.12, 0.35, 0xd8a93b, 8), s2 * (bw / 2 + 0.55), 0.78, -bl / 2 + 0.5); const m = glow(0x999999); anim.tiles.push({ mat: m, kind: "led", col: 0xffd9a0, day: 0xf3ead8 }); P(cyl(0.16, 0.22, 0.26, m, 10), s2 * (bw / 2 + 0.55), 1.06, -bl / 2 + 0.5); });
+          break;
+        }
+        case "curvechairs": {
+          (o.seats || []).forEach(([sx, sz], i) => {
+            const x = sx - o.x, z = sz - o.z, col = i ? 0x5f8f8a : 0xe8dcc8;
+            P(cyl(0.45, 0.42, 0.42, col, 16), x, 0.21, z);
+            const back = P(new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.55, 16, 1, true, -Math.PI / 2, Math.PI), new THREE.MeshLambertMaterial({ color: col, side: THREE.DoubleSide })), x, 0.69, z); back.scale.set(1, 1, 0.9);
+          });
+          P(cyl(0.3, 0.3, 0.55, 0x1c1c1e, 6), 0, 0.28, 0.1); P(cyl(0.03, 0.03, 0.4, 0xd8a93b, 5), 0, 0.75, 0.1); P(sph(0.13, glow(0xffe2b0)), 0, 1.0, 0.1);
+          break;
+        }
+        case "concierge": {
+          P(cyl(0.22, 0.3, 1.0, 0x1c1c1e, 12), 0, 0.5, 0);
+          const scr = P(box(0.5, 0.36, 0.04, glow(0x3a6fd8)), 0, 1.12, 0.05); scr.rotation.x = -0.6;
+          anim.tiles.push({ mat: scr.material, kind: "tv" });
+          break;
+        }
         case "door": {
           // A doormat with a glowing exit arrow (the front wall is cut away, Sims-style).
           P(box(2.2, 0.04, 1.1, 0x6d4c41), 0, 0.03, 0);
@@ -374,11 +496,11 @@
         default: P(box(w, 1, d, 0x9e9e9e), 0, 0.5, 0);
       }
       // Chairs for tables and desks.
-      if (["table", "desk", "bar"].includes(o.k)) (o.seats || []).forEach(([sx, sz, r, pose]) => {
+      if (["table", "desk", "bar", "dining"].includes(o.k)) (o.seats || []).forEach(([sx, sz, r, pose]) => {
         if (pose !== "sit") return;
         const ch = new THREE.Group();
         ch.position.set(sx, 0, sz); ch.rotation.y = r;
-        const c = type === "club" || type === "lounge" ? 0x880e4f : type === "restaurant" ? 0x5d4037 : type === "mamaput" ? 0xd62828 : 0xa1785a;
+        const c = type === "shortlet" ? 0x2b2b2b : type === "club" || type === "lounge" ? 0x880e4f : type === "restaurant" ? 0x5d4037 : type === "mamaput" ? 0xd62828 : 0xa1785a;
         put(box(0.6, 0.08, 0.6, c), 0, 0.72, 0, ch); put(box(0.6, 0.7, 0.08, c), 0, 1.05, -0.3, ch); put(cyl(0.04, 0.04, 0.72, 0x333333, 5), 0, 0.36, 0, ch);
         g.add(ch);
       });
@@ -480,6 +602,47 @@
         led(0, -RD / 2 + 0.3, RW - 0.6, 0.06, 0xffd9a0); led(-RW / 2 + 0.3, 0, 0.06, RD - 0.6, 0xffd9a0); led(RW / 2 - 0.3, 0, 0.06, RD - 0.6, 0xffd9a0);
       }
     }
+    if (T.glass) {
+      // Geometric black-and-white rug under the sectional.
+      const rc = document.createElement("canvas"); rc.width = 256; rc.height = 160; const rx = rc.getContext("2d");
+      rx.fillStyle = "#f4f2ee"; rx.fillRect(0, 0, 256, 160); rx.strokeStyle = "#1c1c1e"; rx.lineWidth = 5;
+      for (let i = -6; i < 14; i++) { rx.beginPath(); rx.moveTo(i * 28, 0); rx.lineTo(i * 28 + 80, 160); rx.moveTo(i * 28 + 80, 0); rx.lineTo(i * 28, 160); rx.stroke(); }
+      rx.lineWidth = 10; rx.strokeRect(5, 5, 246, 150);
+      const rug = put(new THREE.Mesh(new THREE.PlaneGeometry(6.4, 4.2), new THREE.MeshLambertMaterial({ map: new THREE.CanvasTexture(rc) })), -2.6, 0.012, -1.4); rug.rotation.x = -Math.PI / 2;
+      // Ring chandelier over the lounge.
+      const ring = glow(0x999999); anim.tiles.push({ mat: ring, kind: "led", col: 0xfff3dc, day: 0xf4f4f4 });
+      [1.3, 0.9].forEach((r, i) => { const t = put(new THREE.Mesh(new THREE.TorusGeometry(r, 0.05, 8, 40), ring), -2.6, 4.0 - i * 0.35, 0.2); t.rotation.x = Math.PI / 2; });
+      [-1, 1].forEach((a) => put(cyl(0.008, 0.008, 1.2, 0x555555, 3), -2.6 + a * 1.2, 4.6, 0.2));
+      // Cove lighting along the top of the walls and LED skirting.
+      const cove = (x, z, w2, d2, y) => { const m = glow(0x888888); anim.tiles.push({ mat: m, kind: "led", col: 0xfff1d6, day: 0xf2f2f2 }); put(box(w2, 0.05, d2, m), x, y, z); };
+      cove(-RW / 2 + 0.2, 0, 0.05, RD - 0.4, H - 0.2); cove(-RW / 2 + 0.2, 0, 0.05, RD - 0.4, 0.04);
+      cove(0, -RD / 2 + 0.15, RW - 0.4, 0.05, 0.04);
+      // Big potted plants.
+      [[-12.2, 1.2], [12.2, -1.6], [12.2, 2.6], [-6.8, -3.6]].forEach(([x, z]) => {
+        put(cyl(0.4, 0.32, 0.8, 0xf5f5f3, 12), x, 0.4, z);
+        for (let i = 0; i < 4; i++) put(new THREE.Mesh(new THREE.IcosahedronGeometry(0.45, 0), lam(i % 2 ? 0x2f7d3c : 0x3f9b4f)), x + Math.cos(i * 1.6) * 0.25, 1.2 + i * 0.35, z + Math.sin(i * 1.6) * 0.25);
+        colliders.push({ x0: x - 0.45, x1: x + 0.45, z0: z - 0.45, z1: z + 0.45 });
+      });
+      // A low glass partition hides the spa bathroom.
+      put(box(0.06, 2.4, 3.4, new THREE.MeshLambertMaterial({ color: 0xe8eef2, transparent: true, opacity: 0.55 })), -9.9, 1.2, 7.2);
+      colliders.push({ x0: -10, x1: -9.8, z0: 5.5, z1: 8.9 });
+      // Outside the glass: lawn, a lit infinity pool with loungers, palms, a hedge and the ocean.
+      const lawn = put(new THREE.Mesh(new THREE.PlaneGeometry(RW + 60, RD + 50), lam(0x3f7a3a)), 0, -0.3, -6); lawn.rotation.x = -Math.PI / 2;
+      put(box(RW + 6, 0.12, 9, 0xe9e4da), 0, -0.24, -RD / 2 - 5);
+      const water = new THREE.MeshLambertMaterial({ color: 0x2bb8e0, emissive: 0x000000 });
+      put(box(16, 0.06, 4.2, water), -2, -0.15, -RD / 2 - 5.2); anim.tiles.push({ mat: water, kind: "poolglow" });
+      [-8, -5.5, 4, 6.5].forEach((x) => { put(box(0.8, 0.25, 2.0, 0xffffff), x, -0.05, -RD / 2 - 1.6); put(box(0.78, 0.5, 0.12, 0xffffff), x, 0.15, -RD / 2 - 0.8).rotation.x = -0.6; });
+      const palm = (x, z, sc = 1) => {
+        const t = put(cyl(0.12 * sc, 0.2 * sc, 4.4 * sc, 0x9a7448, 6), x, 2.2 * sc - 0.3, z); t.rotation.z = 0.08;
+        for (let i = 0; i < 7; i++) { const l = put(box(2.4 * sc, 0.06, 0.5 * sc, 0x2f9b48), x + 0.2, 4.1 * sc, z); l.rotation.y = (i / 7) * Math.PI * 2; l.rotation.z = -0.38; l.translateX(1.0 * sc); }
+      };
+      [[-15, -12], [15, -12], [16.5, 0], [-16.5, -4], [9, -15.5], [-9, -15.5]].forEach(([x, z]) => palm(x, z, 1.3));
+      put(box(1.0, 1.2, RD + 10, 0x2f6b3c), RW / 2 + 5, 0.3, -2); put(box(1.0, 1.2, RD + 10, 0x2f6b3c), -RW / 2 - 5, 0.3, -2);
+      put(box(RW + 10, 1.0, 0.6, 0xf0ede6), 0, 0.2, -RD / 2 - 10);
+      const sea = put(new THREE.Mesh(new THREE.PlaneGeometry(RW + 140, 80), new THREE.MeshLambertMaterial({ color: 0x3d97cf })), 0, -0.6, -RD / 2 - 52); sea.rotation.x = -Math.PI / 2;
+      anim.tiles.push({ mat: sea.material, kind: "sea" });
+      const warm = new THREE.PointLight(0xffd9a0, 0, 26); warm.position.set(0, 4.2, 0); g.add(warm); anim.night = warm;
+    }
     // Christmas from the 15th: a little tree in the corner.
     if ((opts.day || 0) >= 15 && !T.objects.some((o) => o.k === "xtree")) {
       const tx = RW / 2 - 1.1, tz = -RD / 2 + 1.1;
@@ -493,7 +656,7 @@
     main.position.set(0, 3.6, 0); g.add(main);
     if (T.open) { anim.night = main; [[-6, -5, 0xff4fd8], [6, -5, 0x4fc3ff], [0, 3, 0x7c4dff]].forEach(([x, z, c]) => { const l = new THREE.PointLight(c, 0, 14); l.position.set(x, 3.2, z); g.add(l); anim.lights.push(l); }); }
     if (T.dark) for (let i = 0; i < 3; i++) { const l = new THREE.PointLight(0xff3dbb, 0.9, 12); l.position.set(-3 + i * 3, 3, 0); g.add(l); anim.lights.push(l); }
-    return { group: g, colliders, objects, walls, anim, w: RW, d: RD, dark: !!T.dark, open: !!T.open, type };
+    return { group: g, colliders, objects, walls, anim, w: RW, d: RD, dark: !!T.dark, open: !!T.open, glass: !!T.glass, type };
   }
 
   // Animate dance floors, TVs, neon, candles and disco balls.

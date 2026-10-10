@@ -244,7 +244,7 @@
       // Trees around the blocks.
       const trees = [];
       for (const x of G.cols) for (const z of G.rows) { trees.push([x - 9.6, z - 6.6], [x + 9.6, z - 6.6]); }
-      const inClub = (x, z) => { const bc = this.places.beachclub; return bc && Math.abs(x - bc.x) < bc.w / 2 + 1.5 && Math.abs(z - bc.z) < bc.d / 2 + 1.5; };
+      const inClub = (x, z) => ["beachclub", "shortlet"].some((k) => { const bc = this.places[k]; return bc && Math.abs(x - bc.x) < bc.w / 2 + 2 && Math.abs(z - bc.z) < bc.d / 2 + 2; });
       for (let x = -64; x <= 64; x += 9) if (!inClub(x, lagos ? 59 : 60)) trees.push([x, lagos ? 59 : 60]);
       this.addTrees(trees);
       this.buildDecorations();
@@ -300,9 +300,70 @@
       for (let i = 0; i <= 18; i++) this.add(new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 4), this.bulbMat), x0 - w / 2 + 0.3 + i * (w - 0.6) / 18, 3.5 - Math.sin((i / 18) * Math.PI) * 0.6, z0);
     }
 
+    // The IJGB shortlet from outside: a modern mansion with white and wood-clad
+    // blocks, a grey tower, glass balconies, a garage and palms.
+    buildMansion(p) {
+      const x0 = p.x, z0 = p.z, w = p.w, d = p.d, front = z0 - d / 2;
+      const white = lam(0xf4f4f2), wood = lam(0xa8794f), grey = lam(0x5a5f66), dark = lam(0x2a2d33);
+      const glass = new THREE.MeshLambertMaterial({ color: 0xcfe8ff, transparent: true, opacity: 0.35 });
+      this.add(box(w, 0.25, d, lam(0xdedbd4)), x0, 0.12, z0);
+      const fz = z0 + 0.4 - (d - 2.4) / 2; // building face, leaving a forecourt
+      // Left white block (two storeys, glass balcony), wood-clad centre, low garage wing.
+      this.add(box(6, 6.4, d - 2.4, white), x0 - 6, 3.45, z0 + 0.4);
+      this.add(box(6.5, 4.6, 0.6, this.windowMat), x0 + 0.2, 5.0, fz + 0.1);
+      this.add(box(6, 8.2, d - 2.4, wood), x0 + 0.2, 4.35, z0 + 0.4);
+      for (let i = 0; i < 12; i++) this.add(box(0.08, 3, 0.1, lam(0x6e4a2c)), x0 - 2.5 + i * 0.5, 1.75, fz - 0.05);
+      this.add(box(5.4, 3.0, 0.2, this.windowMat), x0 - 6, 4.6, fz - 0.05);
+      this.add(box(5.6, 0.15, 1.6, white), x0 - 6, 3.1, fz - 0.6);
+      this.add(box(5.6, 1.0, 0.06, glass), x0 - 6, 3.7, fz - 1.4);
+      this.add(box(5.4, 2.4, 0.2, this.windowMat), x0 - 6, 1.5, fz - 0.05);
+      this.add(box(5.5, 3.6, d - 2.4, white), x0 + 6.3, 1.92, z0 + 0.4);
+      this.add(box(4.2, 2.6, 0.12, dark), x0 + 6.3, 1.45, fz - 0.02); // garage door
+      for (let i = 0; i < 6; i++) this.add(box(4.2, 0.04, 0.14, lam(0x3a3e45)), x0 + 6.3, 0.4 + i * 0.42, fz - 0.05);
+      this.add(box(4.5, 2.4, d - 3.4, white), x0 + 6.6, 4.95, z0 + 0.9);
+      this.add(box(4.0, 1.6, 0.2, this.windowMat), x0 + 6.6, 5.0, fz + 0.95);
+      this.add(box(4.6, 0.12, 1.2, white), x0 + 6.6, 3.8, fz + 0.4); this.add(box(4.6, 0.9, 0.06, glass), x0 + 6.6, 4.3, fz - 0.2);
+      // Grey tower and roof slabs.
+      this.add(box(2.6, 10.5, 2.6, grey), x0 - 8, 5.37, z0 + 1.6);
+      this.add(box(0.5, 6, 0.1, this.windowMat), x0 - 8, 6, z0 + 0.25);
+      this.add(box(6.6, 0.3, d - 1.8, white), x0 - 6, 6.8, z0 + 0.4);
+      this.add(box(6.6, 0.3, d - 1.8, grey), x0 + 0.2, 8.6, z0 + 0.4);
+      this.collider(x0, z0 + 0.4, w, d - 2.2);
+      // The garden side (what you mostly see): big glass, balconies and a plunge pool.
+      const bz = z0 + 0.4 + (d - 2.4) / 2;
+      this.add(box(5.4, 2.6, 0.2, this.windowMat), x0 - 6, 1.6, bz + 0.05);
+      this.add(box(5.4, 2.6, 0.2, this.windowMat), x0 - 6, 4.8, bz + 0.05);
+      this.add(box(5.6, 0.15, 1.2, white), x0 - 6, 3.3, bz + 0.6); this.add(box(5.6, 1.0, 0.06, glass), x0 - 6, 3.9, bz + 1.2);
+      this.add(box(5.2, 6.8, 0.2, this.windowMat), x0 + 0.2, 4.0, bz + 0.05);
+      for (let i = 0; i < 6; i++) this.add(box(0.08, 6.8, 0.1, dark), x0 - 2.4 + i * 1.04, 4.0, bz + 0.17);
+      this.add(box(4.8, 2.4, 0.2, this.windowMat), x0 + 6.3, 1.5, bz + 0.05);
+      this.add(box(3.8, 1.6, 0.2, this.windowMat), x0 + 6.6, 5.0, bz - 0.45);
+      this.add(box(w - 1, 0.06, 0.9, new THREE.MeshBasicMaterial({ color: 0x2bc4e8 })), x0, 0.27, z0 + d / 2 - 0.5);
+      [-6, -2, 3].forEach((dx) => this.add(box(0.7, 0.25, 0.5, lam(0xffffff)), x0 + dx, 0.38, bz + 0.45));
+      // Front door with a warm glow.
+      this.add(box(1.6, 2.8, 0.1, lam(0x3a2a1e)), x0 + 0.2, 1.5, fz - 0.12);
+      const warm = new THREE.MeshBasicMaterial({ color: 0xffd27a }); this.neonMats.push(warm);
+      this.add(box(1.8, 0.05, 0.05, warm), x0 + 0.2, 3.0, fz - 0.2);
+      const s = this.add(new THREE.Mesh(new THREE.PlaneGeometry(6, 1.5), new THREE.MeshBasicMaterial({ map: signTexture(p.icon, p.name), transparent: true })), x0 + 0.2, 7.2, fz - 0.06);
+      s.rotation.y = Math.PI;
+      // Cars outside the garage, a round flower bed, bollard lights and palms.
+      [[5.1, 0x111111], [7.5, 0xf2f2f2]].forEach(([dx, c]) => {
+        this.add(box(1.7, 0.7, 3.2, lam(c)), x0 + dx, 0.6, front - 0.1); this.collider(x0 + dx, front - 0.1, 1.8, 3.2);
+        this.add(box(1.5, 0.55, 1.9, lam(0x1f2a36)), x0 + dx, 1.2, front + 0.1);
+        [[-0.8, -1.1], [0.8, -1.1], [-0.8, 1.1], [0.8, 1.1]].forEach(([wx, wz]) => { const t = this.add(new THREE.Mesh(new THREE.CylinderGeometry(0.33, 0.33, 0.25, 10), lam(0x111111)), x0 + dx + wx, 0.35, front - 0.1 + wz); t.rotation.z = Math.PI / 2; });
+      });
+      this.add(new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.25, 0.35, 18), lam(0xdedbd4)), x0 - 3.2, 0.3, front + 0.2);
+      for (let i = 0; i < 10; i++) this.add(new THREE.Mesh(new THREE.SphereGeometry(0.22, 6, 5), lam([0xe53935, 0xffffff, 0xf06292][i % 3])), x0 - 3.2 + Math.cos(i * 0.63) * 0.8, 0.6, front + 0.2 + Math.sin(i * 0.63) * 0.8);
+      this.add(new THREE.Mesh(new THREE.ConeGeometry(0.45, 1.6, 7), lam(0x2f7d3c)), x0 - 3.2, 1.2, front + 0.2);
+      this.collider(x0 - 3.2, front + 0.2, 2.4, 2.4);
+      [-8.5, -6, -1.4, 1.8, 3.6].forEach((dx) => { this.add(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.7, 6), dark), x0 + dx, 0.45, front - 0.3); this.add(new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 4), this.bulbMat), x0 + dx, 0.85, front - 0.3); });
+      [[-w / 2 - 0.6, front + 0.6], [w / 2 + 0.6, front + 0.6], [-w / 2 - 0.6, z0 + d / 2 - 0.5], [w / 2 + 0.6, z0 + d / 2 - 0.5]].forEach(([dx, z]) => this.palm(x0 + dx, z));
+    }
+
     buildPlace(p) {
       const T = W.TYPES[p.type];
       if (p.type === "beachclub") { this.buildBeachClub(p); return; }
+      if (p.type === "shortlet") { this.buildMansion(p); return; }
       const front = p.z + (p.side === "S" ? 1 : -1) * (p.d / 2);
       const dir = p.side === "S" ? 1 : -1;
       const sign = (y, w = Math.min(p.w - 1, 9)) => {
@@ -454,7 +515,7 @@
           this.add(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.5, 4), lam(0xffffff)), x, 1.25, z);
           this.add(box(0.8, 0.2, 1.9, lam(0xffffff)), x + 1, 0.3, z + 0.4);
         }
-        for (let i = 0; i < 7; i++) { const x = -58 + i * 19, bc = this.places.beachclub; if (bc && Math.abs(x - bc.x) < bc.w / 2 + 1.5) continue; this.palm(x, 52.5 + (i % 2) * 1.4); }
+        for (let i = 0; i < 7; i++) { const x = -58 + i * 19; if (["beachclub", "shortlet"].some((k) => { const bc = this.places[k]; return bc && Math.abs(x - bc.x) < bc.w / 2 + 2; })) continue; this.palm(x, 52.5 + (i % 2) * 1.4); }
         signPole(p.x - 21, 52);
       } else if (t === "photo") {
         const wall = this.add(new THREE.Mesh(new THREE.BoxGeometry(9, 4.5, 0.4), [lam(0xffffff), lam(0xffffff), lam(0xffffff), lam(0xffffff), new THREE.MeshBasicMaterial({ map: muralTexture() }), lam(0xffffff)]), p.x, 2.25, p.z + 1);
@@ -974,7 +1035,7 @@
           m.position.y = (wl.h * m.scale.y) / 2;
         });
         const c = this.sim.clock(), hr = c.hh + c.mm / 60;
-        Rooms.animate(this.room, this.time, this.room.open ? 1 - daylight(hr) : 1);
+        Rooms.animate(this.room, this.time, this.room.open || this.room.glass ? 1 - daylight(hr) : 1);
       }
 
       this.updatePeople(realDt);
@@ -1219,7 +1280,7 @@
       const s = this.sim.s;
       const c = this.sim.clock();
       const h = c.hh + c.mm / 60;
-      const openAir = this.interior && this.room && this.room.open;
+      const openAir = this.interior && this.room && (this.room.open || this.room.glass);
       const sky = this.interior && !openAir ? new THREE.Color(0x1d1a24) : skyAt(h);
       this.scene.background = sky;
       this.scene.fog.color = sky;

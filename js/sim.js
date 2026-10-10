@@ -376,7 +376,7 @@
 
     sleepRate() {
       const s = this.s;
-      const bed = s.place === "home" ? [1, 1.3, 1.5][s.home.bed] || 1 : s.place === "hotel" ? 1.4 : 1;
+      const bed = s.place === "home" ? [1, 1.3, 1.5][s.home.bed] || 1 : s.place === "hotel" ? 1.4 : s.place === "shortlet" ? 1.6 : 1;
       return ((this.hasPower() ? 14 : 9) + (this.has("lazy") ? 3 : 0)) * bed;
     }
     decay(m) {
@@ -530,6 +530,13 @@
     peopleAt(placeId) {
       const s = this.s;
       const out = [];
+      if (placeId === "shortlet" && s.activity && s.activity.id === "penthouse_party" && s.place === "shortlet") {
+        // Your guests: friends you've met, plus a few people from around town.
+        W.NPCS.forEach((d) => { const st = s.npcs[d.id]; if (st.met && st.arrived && !d.vendor && !d.family && st.rel >= 30) out.push(d.id); });
+        s.strangers.forEach((st) => { if (st.met && out.length < 14) out.push(st.id); });
+        s.strangers.forEach((st) => { if (!st.met && out.length < 10) out.push(st.id); }); // plus-ones from around town
+        return out.slice(0, 14);
+      }
       W.NPCS.forEach((d) => { const st = s.npcs[d.id]; if (st.place === placeId && !st.move) out.push(d.id); });
       s.strangers.forEach((st) => { if (st.place === placeId && !st.move) out.push(st.id); });
       return out;
@@ -596,6 +603,7 @@
       if (p.type === "family" && this.day() === 25 && !this.s.flags.village) ids.unshift("christmas_lunch");
       if (["church", "club", "family", "lounge", "beach"].includes(p.type) && this.day() === 31 && this.clock().hh >= 22) ids.unshift("crossover");
       if (p.type === "hotel" && this.s.flags.hotelNight === this.day()) ids.unshift("sleep");
+      if (p.type === "shortlet" && this.s.flags.penthouseNight === this.day()) ids.unshift("sleep");
       return ids.map((id) => ({ id, a: this.actionDef(id), why: this.blocked(id, placeId), cost: this.actionCost(id, placeId) }));
     }
     actionDef(id) { return W.ACTIONS[id] || EXTRA_ACTIONS[id]; }
@@ -626,6 +634,8 @@
       if (a.item && !(s.inventory[a.item] > 0)) return `Need a ${W.ITEMS[a.item].name}`;
       if (a.premium && !["ijgb", "pikin"].includes(s.persona) && s.clout < 100 && !(s.inventory.vip_band > 0)) return "Big money only (or 100 clout)";
       if (a.needsPower && !this.hasPower()) return "No light!";
+      if (a.needsBooking && s.flags.penthouseNight !== this.day()) return "Book the penthouse first";
+      if (id === "sleep" && placeId === "shortlet" && s.flags.penthouseNight !== this.day()) return "Book the penthouse first";
       if (a.needsFurniture) { const [k, min] = a.needsFurniture; if ((s.home[k] === undefined ? -1 : s.home[k]) < min) return `Needs: ${SIMS.FURNITURE[k].tiers[min].name} (Buy mode)`; }
       if (id === "toilet" && s.needs.bladder > 90) return "You don't need to go";
       if (id === "shower" && s.needs.hygiene > 92) return "You're already fresh";
@@ -769,9 +779,10 @@
           const home = placeId === "home";
           const cool = home && this.hasPower() && s.home.cooling >= 0;
           if (home && this.hasPower() && s.home.cooling >= 1) this.addMoodlet("cool_comfy");
-          else if (!cool && placeId !== "hotel") this.addMoodlet("hot_night");
+          else if (!cool && placeId !== "hotel" && placeId !== "shortlet") this.addMoodlet("hot_night");
           if (s.needs.energy >= 85) this.addMoodlet("slept_well");
-          if ((home && s.home.bed >= 2) || placeId === "hotel") this.addMoodlet("luxury_sleep");
+          if ((home && s.home.bed >= 2) || placeId === "hotel" || placeId === "shortlet") this.addMoodlet("luxury_sleep");
+          if (placeId === "shortlet") this.addMoodlet("cool_comfy");
           const where = placeId === "hotel" ? "in a soft hotel bed" : home && s.home.cooling >= 1 && this.hasPower() ? "with the AC humming" : this.hasPower() ? "with the fan running" : "in the heat (no light)";
           return ` You slept ${where}.`;
         }
@@ -846,6 +857,11 @@
           return " Great party. The aunties noticed you skipped the aso-ebi, though.";
         }
         case "hotelnight": s.flags.hotelNight = this.day(); return " You can sleep here tonight.";
+        case "penthouse":
+          s.flags.penthouseNight = this.day();
+          this.addMemory(`🔑 Booked ${this.places.shortlet.name} for the night`);
+          this.news("vip");
+          return " The penthouse is yours tonight: sleep in the master bed, or throw a party.";
         case "rentcar": s.flags.car = this.day(); return " The car is yours until midnight. Rides are free (traffic still applies).";
         case "loan": s.naira += 150000; s.flags.loan = 195000; return " ₦150,000 landed. ₦195,000 due before you leave December.";
         case "repay": {
@@ -988,7 +1004,7 @@
     post(placeId) {
       const s = this.s;
       const p = this.places[placeId] || this.places.home;
-      const base = { photo: 140, club: 100, concert: 170, beach: 90, lounge: 90, mall: 50, restaurant: 60, hall: 80, home: 30 }[p.type] || 40;
+      const base = { shortlet: 160, beachclub: 130, photo: 140, club: 100, concert: 170, beach: 90, lounge: 90, mall: 50, restaurant: 60, hall: 80, home: 30 }[p.type] || 40;
       const fit = D.STYLES[s.look.style].shines.includes(p.type) ? 1.5 : 1;
       let gain = base * (1 + s.clout / 150) * fit * (s.persona === "influencer" ? 1.4 : 1) * (this.has("clout") ? 1.3 : 1) * (0.7 + this.rng() * 0.6);
       gain *= (1 + this.skill("photography") * 0.06) * (this.emoFx().posts || 1) * (p.type === "home" && s.home.decor >= 1 ? 2 : 1);
@@ -1857,7 +1873,7 @@
     }
     senderName(from) {
       const n = this.npcDef(from);
-      return n ? n.name : { family: "Family Group 👨🏾‍👩🏾‍👧🏾", bank: "Naija Trust Bank", fashion: "Àṣà Fashion House", promo: "Detty Fest 🎤", brand: "Brand Partnerships", unknown: "Unknown number" }[from] || from;
+      return n ? n.name : { family: "Family Group 👨🏾‍👩🏾‍👧🏾", bank: "Naija Trust Bank", fashion: "Àṣà Fashion House", promo: "Detty Fest 🎤", agent: "Shortlet Agent 🔑", brand: "Brand Partnerships", unknown: "Unknown number" }[from] || from;
     }
     readAll() { this.s.phone.unread = 0; this.s.phone.messages.forEach((m) => { m.read = true; }); }
     reply(msgId, i) {
@@ -1916,6 +1932,8 @@
           choices: [{ label: "Deal!", plan: { kind: "brand", place: "lounge", start: day * DAY - DAY + W.hm("18:00"), end: day * DAY - DAY + W.hm("23:30"), pay } }, { label: "Not tonight" }],
         });
       }
+      // A shortlet agent pitches the penthouse to the big spenders.
+      if (day === 2 && ["ijgb", "pikin", "influencer", "wannabe"].includes(s.persona)) this.message("agent", `The penthouse at ${this.places.shortlet.name} is free this December 🔥 Pool, wine wall, chef on call. ₦350k a night. Just walk in and book on the tablet.`);
       // Wannabe questions.
       if (s.persona === "wannabe" && this.rng() < 0.4) this.message("unknown", "Hey! Saw your London posts. Which borough were you in? My cousin is in Croydon!", { choices: [{ label: "\"Croydon too, small world!\"", exposure: 10, clout: 2 }, { label: "Leave it on read", exposure: 2 }] });
       if (s.persona === "japa" && this.rng() < 0.5) this.message("unknown", "Good morning sir/ma. My uncle gave me your number. Please how can I japa? 🙏🏾🙏🏾", { choices: [{ label: "Send a long voice note", mins: 20, rep: 3, conn: 2, japaCount: true }, { label: "\"Google is free\"", rep: -3 }] });
